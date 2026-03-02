@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/curio_feed}
+    username: ${SPRING_DATASOURCE_USERNAME:curio}
+    password: ${SPRING_DATASOURCE_PASSWORD:curio_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
