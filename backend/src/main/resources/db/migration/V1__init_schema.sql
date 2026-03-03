@@ -17,22 +17,22 @@ CREATE TABLE articles (
     original_title VARCHAR(500) NOT NULL,
     source_name VARCHAR(255) NOT NULL,
     source_url TEXT NOT NULL,
-    original_published_date DATE NOT NULL,
+    original_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
     title VARCHAR(500) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     category_id UUID NOT NULL REFERENCES categories (id),
-    published_date DATE NOT NULL,
+    published_at TIMESTAMP WITH TIME ZONE NOT NULL,
     status VARCHAR(255) NOT NULL,
     thumbnail_url VARCHAR(255) NOT NULL
 );
 
 -- Partial Indexes
-CREATE INDEX idx_articles_date_published 
-ON articles (published_date) 
+CREATE INDEX idx_articles_published_at 
+ON articles (published_at) 
 WHERE status = 'PUBLISHED';
 
-CREATE INDEX idx_articles_category_date_published 
-ON articles (category_id, published_date DESC) 
+CREATE INDEX idx_articles_category_published_at 
+ON articles (category_id, published_at DESC) 
 WHERE status = 'PUBLISHED';
 
 CREATE TABLE article_contents (
