@@ -17,7 +17,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +42,7 @@ public class Article extends BaseEntity {
     private String sourceUrl;
 
     @Column(nullable = false)
-    private LocalDate originalPublishedDate;
+    private Instant originalPublishedAt;
 
     @Column(nullable = false, length = 500)
     private String title;
@@ -55,7 +55,7 @@ public class Article extends BaseEntity {
     private Category category;
 
     @Column(nullable = false)
-    private LocalDate publishedDate;
+    private Instant publishedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
