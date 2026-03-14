@@ -16,21 +16,30 @@ repositories {
 }
 
 ext {
+
     junitVersion = '5.13.0'
 }
 
 dependencies {
+    // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // Database Migration
     implementation 'org.flywaydb:flyway-core'
-    implementation 'org.projectlombok:lombok'
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    // PostgreSQL Driver
     runtimeOnly 'org.postgresql:postgresql'
-    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    // Integration Testing with Testcontainers
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
+    // Testing with Lombok
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    // Support for the test execution platform
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
