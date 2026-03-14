@@ -26,14 +26,12 @@ CREATE TABLE articles (
     thumbnail_url VARCHAR(255) NOT NULL
 );
 
--- Partial Indexes
-CREATE INDEX idx_articles_published_at 
-ON articles (published_at) 
-WHERE status = 'PUBLISHED';
+-- Composite Indexes (Optimized for Pagination & Sorting)
+CREATE INDEX idx_articles_status_published_at 
+ON articles (status, published_at DESC, id DESC);
 
-CREATE INDEX idx_articles_category_published_at 
-ON articles (category_id, published_at DESC) 
-WHERE status = 'PUBLISHED';
+CREATE INDEX idx_articles_category_status_published_at 
+ON articles (category_id, status, published_at DESC, id DESC);
 
 CREATE TABLE article_contents (
     id UUID PRIMARY KEY,
