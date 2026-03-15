@@ -1,10 +1,12 @@
 package com.curiofeed.backend.api.dto;
 
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
+import com.curiofeed.backend.domain.entity.QuizType;
 import lombok.Builder;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Builder
@@ -38,10 +40,10 @@ public record ArticleDetailResponse(
 
     @Builder
     public record QuizDto(
-        String type,
+        QuizType type,
         String question,
-        List<String> options,
-        String answer,
+        Map<String, Object> options,
+        String correctAnswer,
         String explanation
     ) {}
 }
