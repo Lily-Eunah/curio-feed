@@ -64,8 +64,15 @@ public class Article extends BaseEntity {
     @Column(nullable = false)
     private String thumbnailUrl;
 
+    @Column(nullable = false)
+    private long viewCount = 0;
+
     @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ArticleContent> contents = new ArrayList<>();
+
+    public void incrementViewCount() {
+        this.viewCount++;
+    }
 
     @Override
     public boolean equals(Object o) {

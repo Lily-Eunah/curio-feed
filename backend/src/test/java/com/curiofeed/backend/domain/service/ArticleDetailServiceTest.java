@@ -130,6 +130,21 @@ class ArticleDetailServiceTest {
                 .hasMessageContaining("Content not found for level: " + DifficultyLevel.HARD);
     }
 
+    @Test
+    @DisplayName("상세 조회 시 조회수(viewCount)가 1 증가한다")
+    void shouldIncrementViewCount_whenArticleDetailIsRetrieved() {
+        // given
+        setField(mockArticle, "viewCount", 5L);
+        given(articleDetailRepository.findPublishedByIdWithContentsVocabsAndQuizzes(articleId))
+                .willReturn(Optional.of(mockArticle));
+
+        // when
+        articleDetailService.getArticleDetail(articleId, DifficultyLevel.EASY);
+
+        // then
+        assertThat(mockArticle.getViewCount()).isEqualTo(6L);
+    }
+
     // --- Reflection Helpers for creating Mock Entities with Protected Constructors ---
     @SuppressWarnings("unchecked")
     private <T> T newInstance(Class<T> clazz) {

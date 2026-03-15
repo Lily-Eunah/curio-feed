@@ -21,9 +21,12 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
     private final ArticleDetailRepository articleDetailRepository;
 
     @Override
+    @Transactional
     public ArticleDetailResponse getArticleDetail(UUID id, DifficultyLevel level) {
         Article article = articleDetailRepository.findPublishedByIdWithContentsVocabsAndQuizzes(id)
                 .orElseThrow(() -> new EntityNotFoundException("Article not found with id: " + id));
+
+        article.incrementViewCount();
 
         DifficultyLevel targetLevel = (level != null) ? level : DifficultyLevel.EASY;
 
