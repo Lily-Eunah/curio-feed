@@ -23,9 +23,8 @@ public class ArticleDetailController {
     @GetMapping("/{id}")
     public ResponseEntity<ArticleDetailResponse> getArticleDetail(
             @PathVariable UUID id,
-            @RequestParam(required = false) DifficultyLevel level
+            @RequestParam(required = false, defaultValue = "EASY") DifficultyLevel level
     ) {
-        // TODO: Implement according to TDD planning
-        return null;
+        return ResponseEntity.ok(articleDetailService.getArticleDetail(id, level));
     }
 }
