@@ -2,7 +2,9 @@ package com.curiofeed.backend.domain.service;
 
 import com.curiofeed.backend.api.dto.QuizAttemptRequest;
 import com.curiofeed.backend.api.dto.QuizAttemptResponse;
+import com.curiofeed.backend.domain.entity.Quiz;
 import com.curiofeed.backend.domain.repository.QuizRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +18,9 @@ public class QuizServiceImpl implements QuizService {
 
     @Override
     public QuizAttemptResponse attemptQuiz(UUID quizId, QuizAttemptRequest request) {
-        // TODO: intentionally failing for Red phase by returning null.
-        return null;
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new EntityNotFoundException("Quiz not found with id: " + quizId));
+
+        return quiz.evaluate(request.getAnswer());
     }
 }

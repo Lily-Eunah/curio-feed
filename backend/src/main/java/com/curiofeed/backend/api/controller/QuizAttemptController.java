@@ -25,7 +25,7 @@ public class QuizAttemptController {
             @PathVariable UUID id,
             @RequestBody QuizAttemptRequest request
     ) {
-        // TODO: Red phase - purposely not implemented or returning null to fail tests
-        return null;
+        QuizAttemptResponse response = quizService.attemptQuiz(id, request);
+        return ResponseEntity.ok(response);
     }
 }
