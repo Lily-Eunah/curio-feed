@@ -50,4 +50,9 @@ public class Quiz extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "article_content_id", nullable = false)
     private ArticleContent articleContent;
+
+    public com.curiofeed.backend.api.dto.QuizAttemptResponse evaluate(Object answer) {
+        // TODO: Implement scoring and fallback logic
+        return null; // purposeful failure for Red phase
+    }
 }
