@@ -52,8 +52,11 @@ class QuizAttemptControllerTest {
         given(quizService.attemptQuiz(eq(quizId), any(QuizAttemptRequest.class)))
                 .willReturn(mockResponse);
 
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+
         // when & then
-        mockMvc.perform(post("/api/quizzes/{id}/attempt", quizId)
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -81,8 +84,11 @@ class QuizAttemptControllerTest {
         given(quizService.attemptQuiz(eq(quizId), any(QuizAttemptRequest.class)))
                 .willReturn(mockResponse);
 
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+
         // when & then
-        mockMvc.perform(post("/api/quizzes/{id}/attempt", quizId)
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

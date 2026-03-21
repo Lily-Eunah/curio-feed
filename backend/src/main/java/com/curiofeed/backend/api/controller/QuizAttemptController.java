@@ -14,18 +14,20 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/quizzes")
+@RequestMapping("/api/articles/{articleId}/contents/{contentId}/quizzes")
 @RequiredArgsConstructor
 public class QuizAttemptController {
 
     private final QuizService quizService;
 
-    @PostMapping("/{id}/attempt")
+    @PostMapping("/{quizId}/attempts")
     public ResponseEntity<QuizAttemptResponse> attemptQuiz(
-            @PathVariable UUID id,
+            @PathVariable UUID articleId,
+            @PathVariable UUID contentId,
+            @PathVariable UUID quizId,
             @RequestBody QuizAttemptRequest request
     ) {
-        QuizAttemptResponse response = quizService.attemptQuiz(id, request);
+        QuizAttemptResponse response = quizService.attemptQuiz(quizId, request);
         return ResponseEntity.ok(response);
     }
 }
