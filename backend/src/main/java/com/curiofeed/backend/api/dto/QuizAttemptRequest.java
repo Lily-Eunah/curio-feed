@@ -10,5 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class QuizAttemptRequest {
-    private Object answer; // Can be String or List<String> depending on quiz type
+    private String choiceId;
+    private String answerText;
+    private java.util.List<String> answerList;
 }

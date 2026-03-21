@@ -94,7 +94,15 @@ class ArticleDetailRepositoryTest {
         Quiz quiz = newInstance(Quiz.class);
         setField(quiz, "question", "What is the main topic?");
         setField(quiz, "type", QuizType.MULTIPLE_CHOICE);
-        setField(quiz, "options", Map.of("A", "Technology", "B", "Science", "C", "History"));
+        com.curiofeed.backend.domain.model.QuizOptions quizOptions = new com.curiofeed.backend.domain.model.QuizOptions(
+            java.util.List.of(
+                new com.curiofeed.backend.domain.model.QuizChoice("A", "Technology", null),
+                new com.curiofeed.backend.domain.model.QuizChoice("B", "Science", null),
+                new com.curiofeed.backend.domain.model.QuizChoice("C", "History", null)
+            ),
+            null
+        );
+        setField(quiz, "options", quizOptions);
         setField(quiz, "correctAnswer", "A");
         setField(quiz, "explanation", "The article discusses technology.");
         setField(quiz, "articleContent", easyContent);

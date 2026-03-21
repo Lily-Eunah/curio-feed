@@ -67,8 +67,6 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
                         .type(q.getType())
                         .question(q.getQuestion())
                         .options(q.getOptions())
-                        .correctAnswer(q.getCorrectAnswer())
-                        .explanation(q.getExplanation())
                         .build())
                 .toList();
 

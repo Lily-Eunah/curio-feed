@@ -16,10 +16,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import com.curiofeed.backend.domain.model.QuizChoice;
+import com.curiofeed.backend.domain.model.QuizEvaluationResult;
+import com.curiofeed.backend.domain.model.QuizOptions;
+import com.curiofeed.backend.domain.model.QuizSubmission;
 
-import com.curiofeed.backend.api.dto.QuizAttemptResponse;
-
-import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -40,8 +41,8 @@ public class Quiz extends BaseEntity {
     private QuizType type;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
-    private Map<String, Object> options;
+    @Column(columnDefinition = "jsonb")
+    private QuizOptions options;
 
     @Column(nullable = false, length = 255)
     private String correctAnswer;
@@ -53,44 +54,52 @@ public class Quiz extends BaseEntity {
     @JoinColumn(name = "article_content_id", nullable = false)
     private ArticleContent articleContent;
 
-    public QuizAttemptResponse evaluate(Object answer) {
+    public QuizEvaluationResult evaluate(QuizSubmission submission) {
         boolean isCorrect = false;
-        String parsedStringAnswer = "";
-        Object returnedCorrectAnswer = this.correctAnswer;
-
-        if (answer instanceof String) {
-            parsedStringAnswer = ((String) answer).trim();
-            isCorrect = parsedStringAnswer.equalsIgnoreCase(this.correctAnswer.trim());
-        } else if (answer instanceof java.util.List) {
-            @SuppressWarnings("unchecked")
-            java.util.List<String> listAnswer = (java.util.List<String>) answer;
-            parsedStringAnswer = String.join(" ", listAnswer).trim();
-            isCorrect = parsedStringAnswer.equalsIgnoreCase(this.correctAnswer.trim());
-            // Test expects correctAnswer to be returned as a List for array submissions
-            returnedCorrectAnswer = java.util.List.of(this.correctAnswer.split(" "));
-        }
-
         String finalExplanation = this.explanation;
+        Object returnedCorrectAnswer = this.correctAnswer;
+        String submittedAnswerStr = "";
 
-        // Fallback explanation logic
-        if (this.options != null && this.options.containsKey("explanations") && !isCorrect) {
-            Object explanationsObj = this.options.get("explanations");
-            if (explanationsObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, String> explanationsMap = (Map<String, String>) explanationsObj;
-                for (Map.Entry<String, String> entry : explanationsMap.entrySet()) {
-                    if (entry.getKey().trim().equalsIgnoreCase(parsedStringAnswer)) {
-                        finalExplanation = entry.getValue();
-                        break;
+        if (this.type == QuizType.MULTIPLE_CHOICE) {
+            String choiceId = normalize(submission.choiceId());
+            String correctId = normalize(this.correctAnswer);
+            isCorrect = choiceId.equals(correctId);
+            
+            if (!isCorrect && this.options != null) {
+                if (this.options.getChoices() != null) {
+                    for (QuizChoice choice : this.options.getChoices()) {
+                        if (normalize(choice.getKey()).equals(choiceId) && choice.getExplanation() != null) {
+                            finalExplanation = choice.getExplanation();
+                            break;
+                        }
                     }
                 }
+                if (this.options.getExplanations() != null && this.options.getExplanations().containsKey(submission.choiceId())) {
+                    finalExplanation = this.options.getExplanations().get(submission.choiceId());
+                }
             }
+        } else if (this.type == QuizType.SHORT_ANSWER) {
+            submittedAnswerStr = normalize(submission.answerText());
+            isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+        } else if (this.type == QuizType.SCRAMBLE) {
+             if (submission.answerList() != null && !submission.answerList().isEmpty()) {
+                 submittedAnswerStr = normalize(String.join(" ", submission.answerList()));
+                 isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+                 returnedCorrectAnswer = java.util.List.of(this.correctAnswer.split(" "));
+             } else {
+                 submittedAnswerStr = normalize(submission.answerText());
+                 isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+             }
         }
 
-        return QuizAttemptResponse.builder()
+        return QuizEvaluationResult.builder()
                 .isCorrect(isCorrect)
                 .correctAnswer(returnedCorrectAnswer)
                 .explanation(finalExplanation)
                 .build();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ").toLowerCase();
     }
 }

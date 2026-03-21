@@ -41,7 +41,7 @@ class QuizAttemptControllerTest {
     void shouldReturnCorrectContract_whenSubmittedSingleAnswer() throws Exception {
         // given
         UUID quizId = UUID.randomUUID();
-        QuizAttemptRequest request = new QuizAttemptRequest("A");
+        QuizAttemptRequest request = QuizAttemptRequest.builder().choiceId("A").answerText("A").build();
 
         QuizAttemptResponse mockResponse = QuizAttemptResponse.builder()
                 .isCorrect(false)
@@ -68,7 +68,9 @@ class QuizAttemptControllerTest {
         // given
         UUID quizId = UUID.randomUUID();
         // Array submission
-        QuizAttemptRequest request = new QuizAttemptRequest(List.of("London", "in", "live", "I"));
+        QuizAttemptRequest request = QuizAttemptRequest.builder()
+                .answerList(List.of("London", "in", "live", "I"))
+                .build();
 
         QuizAttemptResponse mockResponse = QuizAttemptResponse.builder()
                 .isCorrect(false)

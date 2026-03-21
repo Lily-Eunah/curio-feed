@@ -3,6 +3,7 @@ package com.curiofeed.backend.domain.service;
 import com.curiofeed.backend.api.dto.QuizAttemptRequest;
 import com.curiofeed.backend.api.dto.QuizAttemptResponse;
 import com.curiofeed.backend.domain.entity.Quiz;
+import com.curiofeed.backend.domain.entity.QuizType;
 import com.curiofeed.backend.domain.repository.QuizRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +19,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +37,7 @@ class QuizServiceTest {
         UUID quizId = UUID.randomUUID();
         Quiz mockQuiz = createMockQuiz(quizId, "Paris", "Paris is the capital of France.");
         
-        QuizAttemptRequest request = new QuizAttemptRequest("Paris");
+        QuizAttemptRequest request = QuizAttemptRequest.builder().answerText("Paris").build();
 
         given(quizRepository.findById(quizId)).willReturn(Optional.of(mockQuiz));
 
@@ -56,7 +56,7 @@ class QuizServiceTest {
     void shouldThrowEntityNotFoundException_whenQuizDoesNotExist() {
         // given
         UUID quizId = UUID.randomUUID();
-        QuizAttemptRequest request = new QuizAttemptRequest("Paris");
+        QuizAttemptRequest request = QuizAttemptRequest.builder().answerText("Paris").build();
 
         given(quizRepository.findById(quizId)).willReturn(Optional.empty());
 
@@ -84,6 +84,10 @@ class QuizServiceTest {
             Field expField = Quiz.class.getDeclaredField("explanation");
             expField.setAccessible(true);
             expField.set(quiz, explanation);
+            
+            Field typeField = Quiz.class.getDeclaredField("type");
+            typeField.setAccessible(true);
+            typeField.set(quiz, QuizType.SHORT_ANSWER);
             
             return quiz;
         } catch (Exception e) {
