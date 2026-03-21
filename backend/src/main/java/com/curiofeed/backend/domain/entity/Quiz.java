@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.curiofeed.backend.api.dto.QuizAttemptResponse;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,8 +53,44 @@ public class Quiz extends BaseEntity {
     @JoinColumn(name = "article_content_id", nullable = false)
     private ArticleContent articleContent;
 
-    public com.curiofeed.backend.api.dto.QuizAttemptResponse evaluate(Object answer) {
-        // TODO: Implement scoring and fallback logic
-        return null; // purposeful failure for Red phase
+    public QuizAttemptResponse evaluate(Object answer) {
+        boolean isCorrect = false;
+        String parsedStringAnswer = "";
+        Object returnedCorrectAnswer = this.correctAnswer;
+
+        if (answer instanceof String) {
+            parsedStringAnswer = ((String) answer).trim();
+            isCorrect = parsedStringAnswer.equalsIgnoreCase(this.correctAnswer.trim());
+        } else if (answer instanceof java.util.List) {
+            @SuppressWarnings("unchecked")
+            java.util.List<String> listAnswer = (java.util.List<String>) answer;
+            parsedStringAnswer = String.join(" ", listAnswer).trim();
+            isCorrect = parsedStringAnswer.equalsIgnoreCase(this.correctAnswer.trim());
+            // Test expects correctAnswer to be returned as a List for array submissions
+            returnedCorrectAnswer = java.util.List.of(this.correctAnswer.split(" "));
+        }
+
+        String finalExplanation = this.explanation;
+
+        // Fallback explanation logic
+        if (this.options != null && this.options.containsKey("explanations") && !isCorrect) {
+            Object explanationsObj = this.options.get("explanations");
+            if (explanationsObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, String> explanationsMap = (Map<String, String>) explanationsObj;
+                for (Map.Entry<String, String> entry : explanationsMap.entrySet()) {
+                    if (entry.getKey().trim().equalsIgnoreCase(parsedStringAnswer)) {
+                        finalExplanation = entry.getValue();
+                        break;
+                    }
+                }
+            }
+        }
+
+        return QuizAttemptResponse.builder()
+                .isCorrect(isCorrect)
+                .correctAnswer(returnedCorrectAnswer)
+                .explanation(finalExplanation)
+                .build();
     }
 }
