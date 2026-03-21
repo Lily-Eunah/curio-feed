@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,7 +65,7 @@ class QuizTest {
     }
 
     @Test
-    @DisplayName("주관식 형태의 정답 제출 시 정규화를 통해 정답 여부를 확인한다")
+    @DisplayName("주관식 형태의 정답 제출 시 정규화를 통해 정답 여부를 확인한다 (공백 및 특수문자 무시)")
     void evaluate_shouldReturnCorrectResult_ForShortAnswer() {
         Quiz quiz = createQuiz(
                 QuizType.SHORT_ANSWER,
@@ -76,10 +75,14 @@ class QuizTest {
                 null
         );
 
-        QuizSubmission correctSub = QuizSubmission.builder().answerText("  database    index ").build();
-        QuizEvaluationResult correctResponse = quiz.evaluate(correctSub);
-
-        assertThat(correctResponse.isCorrect()).isTrue();
+        QuizSubmission correctSub1 = QuizSubmission.builder().answerText("  database    index ").build();
+        assertThat(quiz.evaluate(correctSub1).isCorrect()).isTrue();
+        
+        QuizSubmission correctSub2 = QuizSubmission.builder().answerText("Database Index.").build();
+        assertThat(quiz.evaluate(correctSub2).isCorrect()).isTrue();
+        
+        QuizSubmission correctSub3 = QuizSubmission.builder().answerText("database index!  ").build();
+        assertThat(quiz.evaluate(correctSub3).isCorrect()).isTrue();
     }
 
     @Test

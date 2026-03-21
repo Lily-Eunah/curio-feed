@@ -100,6 +100,11 @@ public class Quiz extends BaseEntity {
     }
 
     private String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\\s+", " ").toLowerCase();
+        if (value == null) return "";
+        return value.trim()
+                .toLowerCase()
+                .replaceAll("[.,!?]+$", "") // Strip trailing punctuation
+                .trim() // Trim again in case punctuation leaving space
+                .replaceAll("\\s+", " ");
     }
 }
