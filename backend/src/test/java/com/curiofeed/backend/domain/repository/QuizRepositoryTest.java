@@ -134,6 +134,65 @@ class QuizRepositoryTest {
         assertThat(options.getExplanations()).containsEntry("C", "Just arbitrary string");
     }
 
+    @Test
+    @DisplayName("특정 기사 본문(ArticleContent)에 연관된 퀴즈 목록을 생성일 순으로 조회한다")
+    void shouldFindQuizzesByArticleContentId() {
+        // given (A second quiz for the same content)
+        Quiz quiz2 = newInstance(Quiz.class);
+        setField(quiz2, "question", "Second Quiz");
+        setField(quiz2, "type", QuizType.SHORT_ANSWER);
+        setField(quiz2, "correctAnswer", "Ans");
+        QuizOptions emptyOptions = new QuizOptions(List.of(), Map.of());
+        setField(quiz2, "options", emptyOptions);
+
+        Optional<ArticleContent> contentOpt = quizRepository.findById(quizId).map(Quiz::getArticleContent);
+        assertThat(contentOpt).isPresent();
+        setField(quiz2, "articleContent", contentOpt.get());
+        em.persist(quiz2);
+        em.flush();
+        em.clear();
+
+        // when
+        List<Quiz> quizzes = quizRepository.findByArticleContentIdOrderByCreatedAtAsc(contentOpt.get().getId());
+
+        // then
+        assertThat(quizzes).hasSize(2);
+        assertThat(quizzes.get(0).getQuestion()).isEqualTo("What is JSONB?");
+        assertThat(quizzes.get(1).getQuestion()).isEqualTo("Second Quiz");
+    }
+
+    @Test
+    @DisplayName("nullable 필드(해설, options 등)가 null인 퀴즈도 정상적으로 저장 및 조회된다")
+    void shouldSaveAndRetrieveQuizWithNullableFields() {
+        // given
+        Optional<ArticleContent> contentOpt = quizRepository.findById(quizId).map(Quiz::getArticleContent);
+        assertThat(contentOpt).isPresent();
+
+        Quiz quizNullable = newInstance(Quiz.class);
+        setField(quizNullable, "question", "Short answer without explanation");
+        setField(quizNullable, "type", QuizType.SHORT_ANSWER);
+        setField(quizNullable, "correctAnswer", "DB");
+        QuizOptions emptyOptions = new QuizOptions(List.of(), Map.of());
+        setField(quizNullable, "options", emptyOptions); // MUST NOT BE NULL IN DB
+        setField(quizNullable, "explanation", null); // DB TEXT nullable
+        setField(quizNullable, "articleContent", contentOpt.get());
+        
+        em.persist(quizNullable);
+        UUID nullQuizId = quizNullable.getId();
+        em.flush();
+        em.clear();
+
+        // when
+        Optional<Quiz> result = quizRepository.findById(nullQuizId);
+
+        // then
+        assertThat(result).isPresent();
+        Quiz foundQuiz = result.get();
+        assertThat(foundQuiz.getOptions()).isNotNull();
+        assertThat(foundQuiz.getExplanation()).isNull();
+        assertThat(foundQuiz.getCorrectAnswer()).isEqualTo("DB");
+    }
+
     // --- Reflection Helpers ---
     @SuppressWarnings("unchecked")
     private <T> T newInstance(Class<T> clazz) {

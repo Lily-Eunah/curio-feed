@@ -49,11 +49,11 @@ class QuizAttemptControllerTest {
                 .explanation("선택하신 'A'는 오답이며, 정답은 'B'입니다.")
                 .build();
 
-        given(quizService.attemptQuiz(eq(quizId), any(QuizAttemptRequest.class)))
-                .willReturn(mockResponse);
-
         UUID articleId = UUID.randomUUID();
         UUID contentId = UUID.randomUUID();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willReturn(mockResponse);
 
         // when & then
         mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
@@ -81,11 +81,11 @@ class QuizAttemptControllerTest {
                 .explanation("주어 + 동사 + 전치사구 순서로 구성됩니다.")
                 .build();
 
-        given(quizService.attemptQuiz(eq(quizId), any(QuizAttemptRequest.class)))
-                .willReturn(mockResponse);
-
         UUID articleId = UUID.randomUUID();
         UUID contentId = UUID.randomUUID();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willReturn(mockResponse);
 
         // when & then
         mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
@@ -96,5 +96,45 @@ class QuizAttemptControllerTest {
                 .andExpect(jsonPath("$.correctAnswer[0]").value("I"))
                 .andExpect(jsonPath("$.correctAnswer[3]").value("London"))
                 .andExpect(jsonPath("$.explanation").value("주어 + 동사 + 전치사구 순서로 구성됩니다."));
+    }
+
+    @Test
+    @DisplayName("퀴즈 제출 시 유효하지 않은 요청(IllegalArgumentException)일 경우 400 Bad Request를 반환한다")
+    void shouldReturn400_whenIllegalArgumentExceptionThrown() throws Exception {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        QuizAttemptRequest request = QuizAttemptRequest.builder().build(); // empty request
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willThrow(new IllegalArgumentException("Quiz does not belong to the specified article or content"));
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 퀴즈 제출 시 404 Not Found를 반환한다")
+    void shouldReturn404_whenEntityNotFoundExceptionThrown() throws Exception {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        QuizAttemptRequest request = QuizAttemptRequest.builder().answerText("A").build();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willThrow(new jakarta.persistence.EntityNotFoundException("Quiz not found with id: " + quizId));
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").exists());
     }
 }

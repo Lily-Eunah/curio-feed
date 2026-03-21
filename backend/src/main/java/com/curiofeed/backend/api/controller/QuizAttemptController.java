@@ -27,7 +27,7 @@ public class QuizAttemptController {
             @PathVariable UUID quizId,
             @RequestBody QuizAttemptRequest request
     ) {
-        QuizAttemptResponse response = quizService.attemptQuiz(quizId, request);
+        QuizAttemptResponse response = quizService.attemptQuiz(articleId, contentId, quizId, request);
         return ResponseEntity.ok(response);
     }
 }

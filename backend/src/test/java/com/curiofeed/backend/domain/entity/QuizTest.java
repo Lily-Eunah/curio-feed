@@ -11,6 +11,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class QuizTest {
 
@@ -83,6 +84,54 @@ class QuizTest {
         
         QuizSubmission correctSub3 = QuizSubmission.builder().answerText("database index!  ").build();
         assertThat(quiz.evaluate(correctSub3).isCorrect()).isTrue();
+    }
+
+    @Test
+    @DisplayName("주관식 형태의 정답 제출 시 오답인 경우 false를 반환한다")
+    void evaluate_shouldReturnFalse_ForIncorrectShortAnswer() {
+        Quiz quiz = createQuiz(
+                QuizType.SHORT_ANSWER,
+                "What is a database index?",
+                "Database Index",
+                "An index speeds up data retrieval.",
+                null
+        );
+
+        QuizSubmission wrongSub = QuizSubmission.builder().answerText("Table").build();
+        QuizEvaluationResult wrongResponse = quiz.evaluate(wrongSub);
+
+        assertThat(wrongResponse.isCorrect()).isFalse();
+    }
+
+    @Test
+    @DisplayName("정답 제출 시 타입 불일치 또는 빈 값 입력 시 IllegalArgumentException을 발생시킨다")
+    void evaluate_shouldThrowException_ForInvalidOrMismatchedInputs() {
+        // MULTIPLE_CHOICE requires choiceId
+        Quiz mcQuiz = createQuiz(QuizType.MULTIPLE_CHOICE, "Q", "A", "Exp", null);
+        assertThatThrownBy(() -> mcQuiz.evaluate(QuizSubmission.builder().answerText("A").build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MULTIPLE_CHOICE requires a valid choiceId");
+
+        // SHORT_ANSWER requires answerText
+        Quiz saQuiz = createQuiz(QuizType.SHORT_ANSWER, "Q", "A", "Exp", null);
+        assertThatThrownBy(() -> saQuiz.evaluate(QuizSubmission.builder().choiceId("A").build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SHORT_ANSWER requires a valid answerText");
+
+        // SCRAMBLE requires list or text
+        Quiz scQuiz = createQuiz(QuizType.SCRAMBLE, "Q", "A", "Exp", null);
+        assertThatThrownBy(() -> scQuiz.evaluate(QuizSubmission.builder().choiceId("A").build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SCRAMBLE requires a valid answerList or answerText");
+    }
+
+    @Test
+    @DisplayName("제출된 submission 객체가 null일 경우 IllegalArgumentException을 발생시킨다")
+    void evaluate_shouldThrowException_WhenSubmissionIsNull() {
+        Quiz quiz = createQuiz(QuizType.SHORT_ANSWER, "Q", "A", "Exp", null);
+        assertThatThrownBy(() -> quiz.evaluate(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Quiz submission cannot be null");
     }
 
     @Test

@@ -19,9 +19,14 @@ public class QuizServiceImpl implements QuizService {
     private final QuizRepository quizRepository;
 
     @Override
-    public QuizAttemptResponse attemptQuiz(UUID quizId, QuizAttemptRequest request) {
+    public QuizAttemptResponse attemptQuiz(UUID articleId, UUID contentId, UUID quizId, QuizAttemptRequest request) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found with id: " + quizId));
+
+        if (!quiz.getArticleContent().getId().equals(contentId) ||
+            !quiz.getArticleContent().getArticle().getId().equals(articleId)) {
+            throw new IllegalArgumentException("Quiz does not belong to the specified article or content");
+        }
 
         QuizSubmission submission = QuizSubmission.builder()
                 .choiceId(request.getChoiceId())

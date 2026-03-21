@@ -55,12 +55,19 @@ public class Quiz extends BaseEntity {
     private ArticleContent articleContent;
 
     public QuizEvaluationResult evaluate(QuizSubmission submission) {
+        if (submission == null) {
+            throw new IllegalArgumentException("Quiz submission cannot be null");
+        }
+
         boolean isCorrect = false;
         String finalExplanation = this.explanation;
         Object returnedCorrectAnswer = this.correctAnswer;
         String submittedAnswerStr = "";
 
         if (this.type == QuizType.MULTIPLE_CHOICE) {
+            if (submission.choiceId() == null || submission.choiceId().isBlank()) {
+                throw new IllegalArgumentException("MULTIPLE_CHOICE requires a valid choiceId");
+            }
             String choiceId = normalize(submission.choiceId());
             String correctId = normalize(this.correctAnswer);
             isCorrect = choiceId.equals(correctId);
@@ -79,6 +86,9 @@ public class Quiz extends BaseEntity {
                 }
             }
         } else if (this.type == QuizType.SHORT_ANSWER) {
+            if (submission.answerText() == null || submission.answerText().isBlank()) {
+                throw new IllegalArgumentException("SHORT_ANSWER requires a valid answerText");
+            }
             submittedAnswerStr = normalize(submission.answerText());
             isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
         } else if (this.type == QuizType.SCRAMBLE) {
@@ -86,9 +96,11 @@ public class Quiz extends BaseEntity {
                  submittedAnswerStr = normalize(String.join(" ", submission.answerList()));
                  isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
                  returnedCorrectAnswer = java.util.List.of(this.correctAnswer.split(" "));
-             } else {
+             } else if (submission.answerText() != null && !submission.answerText().isBlank()) {
                  submittedAnswerStr = normalize(submission.answerText());
                  isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+             } else {
+                 throw new IllegalArgumentException("SCRAMBLE requires a valid answerList or answerText");
              }
         }
 
