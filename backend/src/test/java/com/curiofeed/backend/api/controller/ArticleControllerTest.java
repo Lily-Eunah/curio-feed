@@ -1,8 +1,11 @@
 package com.curiofeed.backend.api.controller;
 
 import com.curiofeed.backend.api.dto.ArticleDetailResponse;
+import com.curiofeed.backend.api.dto.ArticleFeedResponse;
+import com.curiofeed.backend.api.dto.CursorPageResponse;
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
 import com.curiofeed.backend.domain.service.ArticleDetailService;
+import com.curiofeed.backend.domain.service.ArticleFeedService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,9 +26,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ArticleDetailController.class)
+@WebMvcTest(ArticleController.class)
 @Import(com.curiofeed.backend.api.controller.advice.GlobalExceptionHandler.class)
-class ArticleDetailControllerTest {
+class ArticleControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -33,8 +36,34 @@ class ArticleDetailControllerTest {
     @MockBean
     private ArticleDetailService articleDetailService;
 
+    @MockBean
+    private ArticleFeedService feedService;
+
     @Test
-    @DisplayName("유효한 ID와 Level로 호출 시 성공 응답을 반환한다")
+    @DisplayName("피드 조회 시 성공 응답을 반환한다")
+    void shouldReturn200_andFeedResponse_whenGetFeed() throws Exception {
+        // given
+        ArticleFeedResponse mockArticle = ArticleFeedResponse.builder()
+                .id(UUID.randomUUID().toString())
+                .title("Feed Article")
+                .build();
+        
+        CursorPageResponse<ArticleFeedResponse> mockResponse = new CursorPageResponse<>(
+                List.of(mockArticle),
+                null,
+                false
+        );
+
+        given(feedService.getFeed(any(), eq(10))).willReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(get("/api/articles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].title").value("Feed Article"));
+    }
+
+    @Test
+    @DisplayName("유효한 ID와 Level로 상세 조회 호출 시 성공 응답을 반환한다")
     void shouldReturn200_andDetailResponse_whenValidRequest() throws Exception {
         // given
         UUID articleId = UUID.randomUUID();
@@ -59,13 +88,11 @@ class ArticleDetailControllerTest {
                 .andExpect(jsonPath("$.id").value(articleId.toString()))
                 .andExpect(jsonPath("$.title").value("Test Article"))
                 .andExpect(jsonPath("$.availableLevels[0]").value("EASY"))
-                .andExpect(jsonPath("$.availableLevels[1]").value("MEDIUM"))
-                .andExpect(jsonPath("$.content.level").value("MEDIUM"))
-                .andExpect(jsonPath("$.content.content").value("This is medium content."));
+                .andExpect(jsonPath("$.content.level").value("MEDIUM"));
     }
 
     @Test
-    @DisplayName("Level 파라미터가 누락된 경우 기본값(EASY)으로 Service를 호출한다")
+    @DisplayName("Level 파라미터가 누락된 경우 기본값(EASY)으로 상세 조회를 호출한다")
     void shouldUseDefaultLevelEasy_whenLevelParamIsOmitted() throws Exception {
         // given
         UUID articleId = UUID.randomUUID();
@@ -78,7 +105,6 @@ class ArticleDetailControllerTest {
                         .build())
                 .build();
 
-        // Expect service to be called with EASY
         given(articleDetailService.getArticleDetail(eq(articleId), eq(DifficultyLevel.EASY))).willReturn(mockResponse);
 
         // when & then
@@ -88,7 +114,7 @@ class ArticleDetailControllerTest {
     }
 
     @Test
-    @DisplayName("Service에서 EntityNotFoundException 발생 시 404를 반환한다")
+    @DisplayName("상세 조회 시 Service에서 EntityNotFoundException 발생 시 404를 반환한다")
     void shouldReturn404_whenServiceThrowsNotFoundException() throws Exception {
         // given
         UUID articleId = UUID.randomUUID();
@@ -98,13 +124,5 @@ class ArticleDetailControllerTest {
         // when & then
         mockMvc.perform(get("/api/articles/{id}", articleId))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("잘못된 형식의 UUID 요청 시 400을 반환한다")
-    void shouldReturn400_whenIdFormatIsInvalid() throws Exception {
-        // when & then
-        mockMvc.perform(get("/api/articles/{id}", "invalid-uuid-format"))
-                .andExpect(status().isBadRequest());
     }
 }

@@ -16,8 +16,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import com.curiofeed.backend.domain.model.QuizChoice;
+import com.curiofeed.backend.domain.model.QuizEvaluationResult;
+import com.curiofeed.backend.domain.model.QuizOptions;
+import com.curiofeed.backend.domain.model.QuizSubmission;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -38,8 +41,8 @@ public class Quiz extends BaseEntity {
     private QuizType type;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
-    private Map<String, Object> options;
+    @Column(columnDefinition = "jsonb")
+    private QuizOptions options;
 
     @Column(nullable = false, length = 255)
     private String correctAnswer;
@@ -50,4 +53,70 @@ public class Quiz extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "article_content_id", nullable = false)
     private ArticleContent articleContent;
+
+    public QuizEvaluationResult evaluate(QuizSubmission submission) {
+        if (submission == null) {
+            throw new IllegalArgumentException("Quiz submission cannot be null");
+        }
+
+        boolean isCorrect = false;
+        String finalExplanation = this.explanation;
+        Object returnedCorrectAnswer = this.correctAnswer;
+        String submittedAnswerStr = "";
+
+        if (this.type == QuizType.MULTIPLE_CHOICE) {
+            if (submission.choiceId() == null || submission.choiceId().isBlank()) {
+                throw new IllegalArgumentException("MULTIPLE_CHOICE requires a valid choiceId");
+            }
+            String choiceId = normalize(submission.choiceId());
+            String correctId = normalize(this.correctAnswer);
+            isCorrect = choiceId.equals(correctId);
+            
+            if (!isCorrect && this.options != null) {
+                if (this.options.getChoices() != null) {
+                    for (QuizChoice choice : this.options.getChoices()) {
+                        if (normalize(choice.getKey()).equals(choiceId) && choice.getExplanation() != null) {
+                            finalExplanation = choice.getExplanation();
+                            break;
+                        }
+                    }
+                }
+                if (this.options.getExplanations() != null && this.options.getExplanations().containsKey(submission.choiceId())) {
+                    finalExplanation = this.options.getExplanations().get(submission.choiceId());
+                }
+            }
+        } else if (this.type == QuizType.SHORT_ANSWER) {
+            if (submission.answerText() == null || submission.answerText().isBlank()) {
+                throw new IllegalArgumentException("SHORT_ANSWER requires a valid answerText");
+            }
+            submittedAnswerStr = normalize(submission.answerText());
+            isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+        } else if (this.type == QuizType.SCRAMBLE) {
+             if (submission.answerList() != null && !submission.answerList().isEmpty()) {
+                 submittedAnswerStr = normalize(String.join(" ", submission.answerList()));
+                 isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+                 returnedCorrectAnswer = java.util.List.of(this.correctAnswer.split(" "));
+             } else if (submission.answerText() != null && !submission.answerText().isBlank()) {
+                 submittedAnswerStr = normalize(submission.answerText());
+                 isCorrect = submittedAnswerStr.equals(normalize(this.correctAnswer));
+             } else {
+                 throw new IllegalArgumentException("SCRAMBLE requires a valid answerList or answerText");
+             }
+        }
+
+        return QuizEvaluationResult.builder()
+                .isCorrect(isCorrect)
+                .correctAnswer(returnedCorrectAnswer)
+                .explanation(finalExplanation)
+                .build();
+    }
+
+    private String normalize(String value) {
+        if (value == null) return "";
+        return value.trim()
+                .toLowerCase()
+                .replaceAll("[.,!?]+$", "") // Strip trailing punctuation
+                .trim() // Trim again in case punctuation leaving space
+                .replaceAll("\\s+", " ");
+    }
 }

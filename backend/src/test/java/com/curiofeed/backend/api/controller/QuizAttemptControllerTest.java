@@ -1,0 +1,140 @@
+package com.curiofeed.backend.api.controller;
+
+import com.curiofeed.backend.api.dto.QuizAttemptRequest;
+import com.curiofeed.backend.api.dto.QuizAttemptResponse;
+import com.curiofeed.backend.domain.service.QuizService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(QuizAttemptController.class)
+@Import(com.curiofeed.backend.api.controller.advice.GlobalExceptionHandler.class)
+class QuizAttemptControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private QuizService quizService;
+
+    @Test
+    @DisplayName("퀴즈 정답 제출 시 정확한 응답 규격(isCorrect, correctAnswer, explanation)을 반환한다 - 단일 정답")
+    void shouldReturnCorrectContract_whenSubmittedSingleAnswer() throws Exception {
+        // given
+        UUID quizId = UUID.randomUUID();
+        QuizAttemptRequest request = QuizAttemptRequest.builder().choiceId("A").answerText("A").build();
+
+        QuizAttemptResponse mockResponse = QuizAttemptResponse.builder()
+                .isCorrect(false)
+                .correctAnswer("B")
+                .explanation("선택하신 'A'는 오답이며, 정답은 'B'입니다.")
+                .build();
+
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isCorrect").value(false))
+                .andExpect(jsonPath("$.correctAnswer").value("B"))
+                .andExpect(jsonPath("$.explanation").value("선택하신 'A'는 오답이며, 정답은 'B'입니다."));
+    }
+
+    @Test
+    @DisplayName("퀴즈 정답 제출 시 정확한 응답 규격(isCorrect, correctAnswer, explanation)을 반환한다 - 배열 정답(재배열 등)")
+    void shouldReturnCorrectContract_whenSubmittedArrayAnswer() throws Exception {
+        // given
+        UUID quizId = UUID.randomUUID();
+        // Array submission
+        QuizAttemptRequest request = QuizAttemptRequest.builder()
+                .answerList(List.of("London", "in", "live", "I"))
+                .build();
+
+        QuizAttemptResponse mockResponse = QuizAttemptResponse.builder()
+                .isCorrect(false)
+                .correctAnswer(List.of("I", "live", "in", "London"))
+                .explanation("주어 + 동사 + 전치사구 순서로 구성됩니다.")
+                .build();
+
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isCorrect").value(false))
+                .andExpect(jsonPath("$.correctAnswer[0]").value("I"))
+                .andExpect(jsonPath("$.correctAnswer[3]").value("London"))
+                .andExpect(jsonPath("$.explanation").value("주어 + 동사 + 전치사구 순서로 구성됩니다."));
+    }
+
+    @Test
+    @DisplayName("퀴즈 제출 시 유효하지 않은 요청(IllegalArgumentException)일 경우 400 Bad Request를 반환한다")
+    void shouldReturn400_whenIllegalArgumentExceptionThrown() throws Exception {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        QuizAttemptRequest request = QuizAttemptRequest.builder().build(); // empty request
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willThrow(new IllegalArgumentException("Quiz does not belong to the specified article or content"));
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 퀴즈 제출 시 404 Not Found를 반환한다")
+    void shouldReturn404_whenEntityNotFoundExceptionThrown() throws Exception {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID contentId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        QuizAttemptRequest request = QuizAttemptRequest.builder().answerText("A").build();
+
+        given(quizService.attemptQuiz(eq(articleId), eq(contentId), eq(quizId), any(QuizAttemptRequest.class)))
+                .willThrow(new jakarta.persistence.EntityNotFoundException("Quiz not found with id: " + quizId));
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/contents/{contentId}/quizzes/{quizId}/attempts", articleId, contentId, quizId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").exists());
+    }
+}
