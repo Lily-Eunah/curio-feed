@@ -1,0 +1,39 @@
+package com.curiofeed.backend.domain.repository;
+
+import com.curiofeed.backend.domain.entity.ArticleGenerationSubJob;
+import com.curiofeed.backend.domain.entity.DifficultyLevel;
+import com.curiofeed.backend.domain.entity.JobStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface ArticleGenerationSubJobRepository extends JpaRepository<ArticleGenerationSubJob, UUID> {
+
+    Optional<ArticleGenerationSubJob> findByJobIdAndLevel(UUID jobId, DifficultyLevel level);
+
+    List<ArticleGenerationSubJob> findByJobId(UUID jobId);
+
+    /**
+     * PENDING → PROCESSING 원자적 상태 전이.
+     * 상태 조건 UPDATE이므로 동시 요청이 와도 하나만 성공.
+     * 반환값 1 = lock 성공, 0 = 이미 다른 상태 (실패).
+     *
+     * 주의: JPQL direct UPDATE는 상태 전이 검증을 우회하므로
+     *       이 메서드 외의 상태 변경은 반드시 entity.updateStatus() 를 사용할 것.
+     */
+    @Modifying
+    @Query("UPDATE ArticleGenerationSubJob s SET s.status = 'PROCESSING' WHERE s.id = :id AND s.status = 'PENDING'")
+    int tryLockSubJob(@Param("id") UUID id);
+
+    @Modifying
+    @Query("UPDATE ArticleGenerationSubJob s SET s.lastHeartbeatAt = :heartbeat WHERE s.id = :id")
+    void updateHeartbeat(@Param("id") UUID id, @Param("heartbeat") Instant heartbeat);
+}
