@@ -15,3 +15,18 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
         default_batch_fetch_size: 100
+  threads:
+    virtual:
+      enabled: true
+
+ai:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:gemma3:4b}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 120
+  pipeline:
+    max-retry-count: 3
+    stale-job-threshold-minutes: 10
+    scheduler-fixed-delay-ms: 3000
+    scheduler-batch-size: 5

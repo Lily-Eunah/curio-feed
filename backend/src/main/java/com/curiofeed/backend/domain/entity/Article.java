@@ -6,13 +6,12 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,7 +28,7 @@ import java.util.UUID;
 public class Article extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
     @Column(nullable = false, length = 500)
@@ -38,7 +37,7 @@ public class Article extends BaseEntity {
     @Column(nullable = false)
     private String sourceName;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, unique = true, columnDefinition = "TEXT")
     private String sourceUrl;
 
     @Column(nullable = false)
@@ -63,6 +62,9 @@ public class Article extends BaseEntity {
 
     @Column(nullable = false)
     private String thumbnailUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String originalContent;
 
     @Column(nullable = false)
     private long viewCount = 0;
