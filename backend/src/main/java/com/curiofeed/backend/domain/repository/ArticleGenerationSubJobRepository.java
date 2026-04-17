@@ -36,4 +36,7 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
     @Modifying
     @Query("UPDATE ArticleGenerationSubJob s SET s.lastHeartbeatAt = :heartbeat WHERE s.id = :id")
     void updateHeartbeat(@Param("id") UUID id, @Param("heartbeat") Instant heartbeat);
+
+    @Query("SELECT s FROM ArticleGenerationSubJob s WHERE s.status = 'PENDING' ORDER BY s.createdAt ASC")
+    List<ArticleGenerationSubJob> findPendingJobs(org.springframework.data.domain.Pageable pageable);
 }
