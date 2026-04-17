@@ -41,6 +41,13 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
     List<ArticleGenerationSubJob> findPendingJobs(org.springframework.data.domain.Pageable pageable);
 
     /**
+     * Admin API 전용: FAILED SubJob을 PENDING으로 재설정, retryCount=0으로 초기화.
+     */
+    @Modifying
+    @Query("UPDATE ArticleGenerationSubJob s SET s.status = 'PENDING', s.retryCount = 0 WHERE s.id = :id")
+    void resetToPendingWithRetryReset(@Param("id") UUID id);
+
+    /**
      * ReconciliationScheduler 전용: stale SubJob을 PENDING으로 복구.
      * JPQL direct UPDATE 예외 허용 케이스 (stale 복구, 상태 검증 우회 의도적).
      */
