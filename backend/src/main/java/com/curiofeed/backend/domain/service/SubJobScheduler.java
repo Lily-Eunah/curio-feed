@@ -39,7 +39,7 @@ public class SubJobScheduler {
      * fixedDelay: 앞 실행이 완료된 후 대기 → 중복 실행 방지.
      * fixedDelayString으로 설정값 연동.
      */
-    @Scheduled(fixedDelayString = "#{pipelineProperties.schedulerFixedDelayMs}")
+    @Scheduled(fixedDelayString = "${ai.pipeline.scheduler-fixed-delay-ms:3000}")
     public void processPending() {
         List<ArticleGenerationSubJob> pendingSubJobs = subJobRepository.findPendingJobs(
                 PageRequest.of(0, pipelineProperties.schedulerBatchSize()));

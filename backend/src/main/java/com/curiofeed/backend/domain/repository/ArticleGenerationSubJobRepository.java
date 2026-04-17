@@ -39,4 +39,32 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
 
     @Query("SELECT s FROM ArticleGenerationSubJob s WHERE s.status = 'PENDING' ORDER BY s.createdAt ASC")
     List<ArticleGenerationSubJob> findPendingJobs(org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * ReconciliationScheduler 전용: stale SubJob을 PENDING으로 복구.
+     * JPQL direct UPDATE 예외 허용 케이스 (stale 복구, 상태 검증 우회 의도적).
+     */
+    @Modifying
+    @Query("UPDATE ArticleGenerationSubJob s SET s.status = 'PENDING' WHERE s.id = :id AND s.status = 'PROCESSING'")
+    void resetToPending(@Param("id") UUID id);
+
+    /**
+     * ReconciliationScheduler 전용: FAILED 강제 설정.
+     */
+    @Modifying
+    @Query("UPDATE ArticleGenerationSubJob s SET s.status = :status WHERE s.id = :id")
+    void forceSetStatus(@Param("id") UUID id, @Param("status") JobStatus status);
+
+    /**
+     * Stale PROCESSING SubJob 조회:
+     * - lastHeartbeatAt IS NULL AND createdAt < threshold (heartbeat 시작 전 서버 장애)
+     * - OR lastHeartbeatAt < threshold (heartbeat 중단)
+     */
+    @Query("""
+            SELECT s FROM ArticleGenerationSubJob s
+            WHERE s.status = 'PROCESSING'
+              AND ((s.lastHeartbeatAt IS NULL AND s.createdAt < :threshold)
+                   OR s.lastHeartbeatAt < :threshold)
+            """)
+    List<ArticleGenerationSubJob> findStaleProcessingJobs(@Param("threshold") Instant threshold);
 }
