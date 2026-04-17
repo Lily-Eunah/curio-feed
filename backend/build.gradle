@@ -8,7 +8,12 @@ group = 'com.curiofeed'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    sourceCompatibility = '17'
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
 
 repositories {
@@ -16,8 +21,8 @@ repositories {
 }
 
 ext {
-
     junitVersion = '5.13.0'
+    testcontainersVersion = '2.0.4'
 }
 
 dependencies {
@@ -32,6 +37,8 @@ dependencies {
     // PostgreSQL Driver
     runtimeOnly 'org.postgresql:postgresql'
     // Integration Testing with Testcontainers
+    testImplementation platform("org.testcontainers:testcontainers-bom:${testcontainersVersion}")
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
@@ -45,4 +52,32 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    testLogging {
+        showStandardStreams = false
+        events "started", "passed", "skipped", "failed"
+        exceptionFormat "full"
+
+        // 테스트 요약 정보 출력
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nTest Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
+            }
+        }
+    }
+
+    systemProperty "file.encoding", "UTF-8"
+    systemProperty "sun.stdout.encoding", "UTF-8"
+    systemProperty "sun.stderr.encoding", "UTF-8"
+    // Java 21: 표준 출력/에러 인코딩 강제
+    systemProperty "stdout.encoding", "UTF-8"
+    systemProperty "stderr.encoding", "UTF-8"
+
+    // 핵심: Testcontainers + Docker 데몬 연동 설정
+    jvmArgs "-Ddocker.client.version=1.41"
+    jvmArgs "-Dfile.encoding=UTF-8"
+
+    // 위 설정과 같이 부여 (중요)
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
+
 }
