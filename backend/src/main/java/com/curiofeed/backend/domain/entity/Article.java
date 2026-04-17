@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -66,11 +67,18 @@ public class Article extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String originalContent;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false)
     private long viewCount = 0;
 
     @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ArticleContent> contents = new ArrayList<>();
+
+    public void updateStatus(ArticleStatus newStatus) {
+        this.status = newStatus;
+    }
 
     public void incrementViewCount() {
         this.viewCount++;
