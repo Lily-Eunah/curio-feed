@@ -196,9 +196,13 @@ class ArticleFeedRepositoryTest {
     void shouldHandleSamePublishedAtWithIdTieBreaker() {
         Instant sameTime = Instant.parse("2026-06-01T00:00:00Z");
         Article a1 = createArticle(category, ArticleStatus.PUBLISHED, sameTime, "same-time-1");
+        // UUID v7은 시간순이므로, a2가 a1보다 반드시 큰 UUID를 가짐
         Article a2 = createArticle(category, ArticleStatus.PUBLISHED, sameTime, "same-time-2");
         em.flush();
         em.clear();
+
+        // a2.id > a1.id 확인 (UUID v7 시간순 보장)
+        assertThat(a2.getId()).isGreaterThan(a1.getId());
 
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
                 ArticleStatus.PUBLISHED, PageRequest.of(0, 100));
@@ -209,10 +213,9 @@ class ArticleFeedRepositoryTest {
                 .toList();
 
         assertThat(sameTimeResults).hasSize(2);
-        // First should have larger UUID (DESC order)
-        UUID firstId = UUID.fromString(sameTimeResults.get(0).getId());
-        UUID secondId = UUID.fromString(sameTimeResults.get(1).getId());
-        assertThat(firstId).isGreaterThan(secondId);
+        // ORDER BY id DESC -> 나중에 생성된 a2가 먼저 나와야 함
+        assertThat(sameTimeResults.get(0).getId()).isEqualTo(a2.getId().toString());
+        assertThat(sameTimeResults.get(1).getId()).isEqualTo(a1.getId().toString());
     }
 
     @Test
@@ -225,11 +228,8 @@ class ArticleFeedRepositoryTest {
         em.flush();
         em.clear();
 
-        // Sort IDs descending to find the "middle" one as cursor
-        List<UUID> sortedIds = List.of(a1.getId(), a2.getId(), a3.getId()).stream()
-                .sorted(java.util.Comparator.reverseOrder())
-                .toList();
-        UUID cursorId = sortedIds.get(0); // largest id (top of the list)
+        // UUID v7: 생성 순서 = 정렬 순서이므로, a3가 가장 큰 ID
+        UUID cursorId = a3.getId();
 
         List<ArticleFeedResponse> results = feedRepository.findFeedByCursor(
                 ArticleStatus.PUBLISHED, sameTime, cursorId, PageRequest.of(0, 100));
@@ -240,10 +240,12 @@ class ArticleFeedRepositoryTest {
                 .toList();
         assertThat(returnedIds).doesNotContain(cursorId.toString());
 
-        // All sameTime results should have id < cursorId
-        results.stream()
+        // sameTime 결과 중 a1, a2만 포함 (a3는 커서이므로 제외)
+        List<String> sameTimeIds = results.stream()
                 .filter(r -> r.getPublishedAt().equals(sameTime))
-                .forEach(r -> assertThat(UUID.fromString(r.getId())).isLessThan(cursorId));
+                .map(ArticleFeedResponse::getId)
+                .toList();
+        assertThat(sameTimeIds).containsExactly(a2.getId().toString(), a1.getId().toString());
     }
 
     @Test
