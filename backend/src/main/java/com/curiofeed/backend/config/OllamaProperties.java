@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record OllamaProperties(
         String baseUrl,
         String model,
+        String fallbackModel,
         int connectTimeoutSeconds,
         int readTimeoutSeconds
 ) {
