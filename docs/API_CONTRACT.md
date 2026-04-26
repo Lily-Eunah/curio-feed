@@ -243,7 +243,7 @@ Expected response: a single `ArticleDetailResponse` or a minimal stub:
 
 Logic: same category, same level, older `publishedAt`.
 
-**Status:** Not yet implemented. Will be added if required by the frontend integration; otherwise the MVP fallback below applies.
+**Status:** Out of scope for MVP. Do NOT implement this endpoint during the `feature/frontend-backend-integration` branch unless the feedCache fallback proves insufficient after real integration testing. The MVP fallback below is the primary implementation path.
 
 ### MVP Fallback: Client-Side Computation
 
