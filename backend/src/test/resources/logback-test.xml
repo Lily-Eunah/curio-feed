@@ -1,0 +1,26 @@
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <charset>UTF-8</charset>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 🔥 핵심: 로그 노이즈 제거 -->
+    <logger name="org.testcontainers" level="INFO"/>
+    <logger name="com.github.dockerjava" level="INFO"/>
+    <logger name="org.springframework.boot.testcontainers" level="INFO"/>
+    <!-- Hibernate SQL은 필요할 때만 DEBUG로 변경 -->
+    <logger name="org.hibernate.SQL" level="WARN"/>
+    <logger name="org.hibernate.type.descriptor.sql" level="WARN"/>
+    <!-- Spring 내부 로그 최소화 -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.flywaydb" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

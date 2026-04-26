@@ -5,12 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,7 +29,7 @@ import java.util.UUID;
 public class Quiz extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -53,6 +52,18 @@ public class Quiz extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "article_content_id", nullable = false)
     private ArticleContent articleContent;
+
+    public static Quiz create(ArticleContent content, QuizType type, String question,
+                              QuizOptions options, String correctAnswer, String explanation) {
+        Quiz q = new Quiz();
+        q.articleContent = content;
+        q.type = type;
+        q.question = question;
+        q.options = options;
+        q.correctAnswer = correctAnswer;
+        q.explanation = explanation;
+        return q;
+    }
 
     public QuizEvaluationResult evaluate(QuizSubmission submission) {
         if (submission == null) {

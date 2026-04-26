@@ -6,14 +6,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,7 +34,7 @@ import java.util.UUID;
 public class ArticleContent extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
     @Enumerated(EnumType.STRING)
@@ -56,4 +55,16 @@ public class ArticleContent extends BaseEntity {
 
     @OneToMany(mappedBy = "articleContent", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Quiz> quizzes = new ArrayList<>();
+
+    public static ArticleContent create(Article article, DifficultyLevel level, String content) {
+        ArticleContent ac = new ArticleContent();
+        ac.article = article;
+        ac.level = level;
+        ac.content = content;
+        return ac;
+    }
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
 }

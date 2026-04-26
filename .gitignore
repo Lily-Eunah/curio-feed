@@ -11,3 +11,7 @@ out/
 *.class
 design/
 reference/
+
+# Claude Code
+.claude/
+CLAUDE.md

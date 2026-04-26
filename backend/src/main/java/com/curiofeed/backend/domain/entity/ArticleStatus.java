@@ -4,5 +4,6 @@ public enum ArticleStatus {
     DRAFT,
     REVIEWING,
     PUBLISHED,
-    HIDDEN
+    HIDDEN,
+    FAILED
 }

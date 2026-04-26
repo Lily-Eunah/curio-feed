@@ -19,4 +19,8 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
 
     // Retrieve an article by slug unless it's hidden
     Optional<Article> findBySlugAndStatusNot(String slug, ArticleStatus status);
+
+    Optional<Article> findBySourceUrl(String sourceUrl);
+
+    boolean existsBySlug(String slug);
 }
