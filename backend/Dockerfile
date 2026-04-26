@@ -1,5 +1,5 @@
 # Build stage
-FROM gradle:8.6-jdk17-alpine AS build
+FROM gradle:8.6-jdk21-alpine AS build
 WORKDIR /app
 COPY build.gradle settings.gradle ./
 COPY src src
@@ -8,7 +8,7 @@ COPY src src
 RUN gradle bootJar -x test
 
 # Run stage
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 EXPOSE 8080
