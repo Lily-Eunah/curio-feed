@@ -61,6 +61,8 @@ The frontend must handle both 400 and 404 gracefully (show error state, not cras
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
+| `level` | enum | No | `EASY` | `EASY`, `MEDIUM`, or `HARD` — controls which level's content is used for `excerpt` and `estimatedReadingTime`; articles without content at this level are excluded from results |
+| `category` | string | No | — | Category display name (e.g. `Tech`). Omit or pass `ALL` for no category filter |
 | `cursor` | string | No | — | Opaque cursor token from previous response |
 | `size` | int | No | `10` | Page size |
 
@@ -93,7 +95,7 @@ The frontend must handle both 400 and 404 gracefully (show error state, not cras
 - `id`: UUID string (UUID v7, time-ordered)
 - `publishedAt`: ISO-8601 string (`Instant` serialized by Jackson). Frontend converts to display label (Today / Yesterday / date string).
 - `estimatedReadingTime`: integer, minutes. Derived server-side from content word count (`ceil(wordCount / 200)`). Not stored in DB.
-- `excerpt`: short preview string (~160 characters). Derived server-side from the first paragraph of the article's `EASY` content. Not stored in DB. May be truncated with `…` if over limit.
+- `excerpt`: short preview string (~160 characters). Derived server-side from the first paragraph of the `ArticleContent` that matches the requested `level`. Not stored in DB. Truncated with `…` if over limit. If the requested level's content is unavailable, the article is excluded from the feed (preferred behavior); `originalContent` is a last-resort fallback only and must not be primary behavior.
 - `thumbnailUrl`: may be empty string `""`. Frontend must handle gracefully.
 - `sourceName`: publication name string.
 
@@ -105,8 +107,10 @@ Feed cards do NOT show: difficulty badge, published date, "5 words", "Read" labe
 
 **Backend implementation notes:**
 
-- `ArticleFeedRepository` currently hardcodes `estimatedReadingTime = 0` in JPQL constructor queries — this must be fixed in the service layer or by changing the JPQL to a result-set projection.
-- `excerpt` is not a DB column. The service must derive it by loading the article's EASY content on feed fetch or by deriving from `originalContent`. See [Required Backend DTO Additions](#required-backend-dto-additions).
+- `ArticleController` currently has no `level` or `category` parameters on `GET /api/articles` — both must be added. See [Required Backend DTO Additions](#required-backend-dto-additions).
+- `ArticleFeedRepository` currently hardcodes `estimatedReadingTime = 0` and has no content join — the queries must be revised to join `article_contents` by level and optionally filter by category display name.
+- `excerpt` and `estimatedReadingTime` are derived in the service layer from the joined content record, not from `originalContent`.
+- No DB schema changes required.
 
 **Verified against:** `ArticleControllerTest.shouldReturn200_andFeedResponse_whenGetFeed`
 
@@ -255,7 +259,7 @@ nextArticle = feedCache
 
 The `nextArticle` is loaded fully via `GET /api/articles/{id}?level={currentLevel}` when the user taps it.
 
-**UI rule (UI_POLICY §10):** Next article is shown after ≥1 quiz answered. Same category, same level, older article. No "next article" button visible before any quiz is answered.
+**UI rule (UI_POLICY §10):** Next article is always shown quietly near the bottom of Article Detail when a next article exists. It is not a gamified completion reward and is not conditional on quiz completion. Selection logic: same selected category (unless `All`), same current level, older `publishedAt`. The frontend resolves the next article from the feed cache if the backend endpoint is not yet available.
 
 ---
 
@@ -447,15 +451,44 @@ Add `UUID id` to `QuizDto`. The value comes from `Quiz.getId()`, already availab
 
 Add `String excerpt` field.
 
-`excerpt` is NOT a DB column. It is computed in the service layer:
-- Derive from `Article.originalContent`: take the first sentence or first ~160 characters, strip trailing whitespace, append `…` if truncated.
-- If `originalContent` is null or blank, fall back to empty string `""`.
+`excerpt` derivation rules (in priority order):
+1. **Primary:** derive from `ArticleContent.content` at the requested `level`. Take the first sentence or first ~160 characters, strip trailing whitespace, append `…` if truncated.
+2. **Exclusion (preferred fallback):** if no content record exists at the requested level, exclude the article from the feed entirely.
+3. **Last resort only:** if `originalContent` must be used as a fallback, it must be documented explicitly at the call site and treated as a data pipeline gap, not normal behavior.
 
-`estimatedReadingTime` is currently hardcoded to `0` in the JPQL constructor queries in `ArticleFeedRepository`. Fix by computing in the service layer after the query returns: for each result, derive reading time from available content if needed, or use a fixed estimate of `5` as a safe default until content-based computation is implemented.
+`estimatedReadingTime` derivation:
+- Primary: `ceil(wordCount / 200)` where `wordCount` counts whitespace-delimited tokens in `ArticleContent.content` at the requested level.
+- If level content is unavailable (and the article is excluded), this value is not applicable.
+- Do NOT hardcode `5` — it is misleading for articles with differing length.
 
-**Why required:** Feed cards must display excerpt (UI_POLICY §2.2) and reading time. Hardcoded 0 produces "0 min read" which is incorrect product behavior.
+**Why required:** Feed cards must display excerpt (UI_POLICY §2.2) and reading time. Hardcoded `0` produces "0 min read" which is incorrect product behavior.
 
-**DB schema:** No changes. `excerpt` is not persisted. `estimatedReadingTime` is not persisted.
+**DB schema:** No changes. Neither `excerpt` nor `estimatedReadingTime` is persisted.
+
+---
+
+### 4. `ArticleController` + `ArticleFeedService` + `ArticleFeedRepository` — add `level` and `category` support
+
+**Files:**
+- `backend/src/main/java/com/curiofeed/backend/api/controller/ArticleController.java`
+- `backend/src/main/java/com/curiofeed/backend/domain/service/ArticleFeedService.java`
+- `backend/src/main/java/com/curiofeed/backend/domain/repository/ArticleFeedRepository.java`
+
+**`ArticleController`:** Add `level` (`DifficultyLevel`, default `EASY`) and `category` (`String`, optional) `@RequestParam`s to the `GET /api/articles` handler. Pass both to `ArticleFeedService.getFeed()`.
+
+**`ArticleFeedService`:** Accept `level` and `category` in `getFeed()`. Pass them through to repository queries. After the repository returns raw rows, compute `excerpt` (truncated content) and `estimatedReadingTime` (word count) from the joined content field.
+
+**`ArticleFeedRepository`:** Revise both JPQL queries (first page and cursor page) to:
+- `JOIN` `article_contents ac ON ac.article_id = a.id AND ac.level = :level`
+- Optionally filter `JOIN a.category c WHERE c.displayName = :categoryName` when `category` is not `ALL` and not null
+- Return `ac.content` (or a trimmed prefix) alongside the existing article fields, replacing the hardcoded `0` for reading time with content length data
+- Articles without a content record at the requested level are excluded (inner join semantics)
+
+**Why required:** Without the level join the feed always shows the same content regardless of user level. Without category filtering, cursor-based pagination cannot be combined with category filtering — offloading this filter to the client breaks cursor semantics.
+
+**DB schema:** No changes. These are read-path query changes only.
+
+**Forbidden:** Do not modify the generation pipeline, scheduler, worker, LLM client, or any write path.
 
 ---
 
