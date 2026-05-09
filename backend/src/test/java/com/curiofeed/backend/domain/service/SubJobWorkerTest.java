@@ -54,7 +54,7 @@ class SubJobWorkerTest {
 
     @BeforeEach
     void setUp() {
-        pipelineProperties = new PipelineProperties(3, 10, 3000, 5, null);
+        pipelineProperties = new PipelineProperties(3, 10, 3000, 5, null, false);
         worker = new SubJobWorker(lockService, subJobRepository, articleRepository, promptBuilder,
                 primaryLlmClient, fallbackLlmClient, responseParser, validator,
                 resultSaver, aggregator, pipelineProperties, metrics);
@@ -72,7 +72,7 @@ class SubJobWorkerTest {
     @DisplayName("primary 통과: status COMPLETED, retryCount=1, aggregate 호출")
     void process_primaryPasses_completed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
@@ -94,7 +94,7 @@ class SubJobWorkerTest {
     @DisplayName("primary score 미달 → fallback 통과: COMPLETED, fallback 사용")
     void process_primaryLowScore_fallbackPasses_completed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
@@ -121,7 +121,7 @@ class SubJobWorkerTest {
     @DisplayName("primary hard fail → fallback 통과: COMPLETED")
     void process_primaryHardFail_fallbackPasses_completed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
@@ -148,7 +148,7 @@ class SubJobWorkerTest {
     @DisplayName("primary + fallback 모두 실패: FAILED")
     void process_primaryAndFallbackFail_failed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("timeout"));
@@ -165,7 +165,7 @@ class SubJobWorkerTest {
     @DisplayName("primary + fallback 모두 파싱 실패: FAILED")
     void process_primaryAndFallbackParseFail_failed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenReturn("bad");
@@ -195,7 +195,7 @@ class SubJobWorkerTest {
     void process_exceedsMaxRetry_failsEarly() {
         setField(subJob, "retryCount", 3);
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
 
         worker.process(subJobId);
 
@@ -220,7 +220,7 @@ class SubJobWorkerTest {
         };
 
         when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findById(subJobId)).thenReturn(Optional.of(subJob));
+        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("fail"));

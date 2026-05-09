@@ -76,11 +76,12 @@ public class SubJobWorker {
             return;
         }
 
-        ArticleGenerationSubJob subJob = subJobRepository.findById(subJobId)
+        ArticleGenerationSubJob subJob = subJobRepository.findByIdWithJob(subJobId)
                 .orElseThrow(() -> new IllegalArgumentException("SubJob not found: " + subJobId));
 
         // 2. retryCount 즉시 증가 (lock 획득 = 1회 시도 소비)
         subJob.incrementRetryCount();
+        subJobRepository.save(subJob);
 
         // 3. maxRetryCount 초과 체크
         if (subJob.getRetryCount() > pipelineProperties.maxRetryCount()) {
@@ -118,6 +119,7 @@ public class SubJobWorker {
 
         // 6. 성공
         subJob.updateStatus(JobStatus.COMPLETED);
+        subJobRepository.save(subJob);
         aggregateIfTerminal(subJob.getJob().getId(), JobStatus.COMPLETED);
     }
 
@@ -171,6 +173,7 @@ public class SubJobWorker {
 
     private void markFailed(ArticleGenerationSubJob subJob) {
         subJob.updateStatus(JobStatus.FAILED);
+        subJobRepository.save(subJob);
         aggregateIfTerminal(subJob.getJob().getId(), JobStatus.FAILED);
     }
 
