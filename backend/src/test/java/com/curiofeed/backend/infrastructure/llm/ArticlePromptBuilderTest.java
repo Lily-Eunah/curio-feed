@@ -34,9 +34,9 @@ class ArticlePromptBuilderTest {
     }
 
     @Test
-    @DisplayName("결과 프롬프트에 'DO NOT include' 문구가 포함된다")
+    @DisplayName("결과 프롬프트에 'Do NOT include' 문구가 포함된다")
     void build_containsDoNotInclude() {
         String prompt = builder.build("Some content", DifficultyLevel.MEDIUM);
-        assertThat(prompt).contains("DO NOT include");
+        assertThat(prompt).contains("Do NOT include");
     }
 }

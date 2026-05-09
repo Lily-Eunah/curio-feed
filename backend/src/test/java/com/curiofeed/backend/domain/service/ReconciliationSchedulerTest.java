@@ -70,7 +70,6 @@ class ReconciliationSchedulerTest {
         setField(article, "category", category);
         setField(article, "publishedAt", Instant.now());
         setField(article, "status", ArticleStatus.DRAFT);
-        setField(article, "thumbnailUrl", "https://t.jpg");
         em.persist(article);
 
         job = new ArticleGenerationJob(article.getId(), JobStatus.PENDING);

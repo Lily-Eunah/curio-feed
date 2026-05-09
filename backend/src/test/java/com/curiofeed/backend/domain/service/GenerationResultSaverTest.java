@@ -59,6 +59,14 @@ class GenerationResultSaverTest {
 
     @BeforeEach
     void setUp() {
+        em.createQuery("DELETE FROM Quiz").executeUpdate();
+        em.createQuery("DELETE FROM Vocabulary").executeUpdate();
+        em.createQuery("DELETE FROM ArticleContent").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationSubJob").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationJob").executeUpdate();
+        em.createQuery("DELETE FROM Article").executeUpdate();
+        em.createQuery("DELETE FROM Category").executeUpdate();
+
         Category category = newInstance(Category.class);
         setField(category, "name", "tech-" + UUID.randomUUID());
         setField(category, "displayName", "Technology");
@@ -76,7 +84,6 @@ class GenerationResultSaverTest {
         setField(article, "category", category);
         setField(article, "publishedAt", Instant.now());
         setField(article, "status", ArticleStatus.DRAFT);
-        setField(article, "thumbnailUrl", "https://example.com/thumb.jpg");
         setField(article, "originalContent", "Original content.");
         em.persist(article);
         em.flush();
