@@ -4,6 +4,7 @@ import com.curiofeed.backend.api.dto.ArticleFeedResponse;
 import com.curiofeed.backend.domain.entity.Article;
 import com.curiofeed.backend.domain.entity.ArticleStatus;
 import com.curiofeed.backend.domain.entity.Category;
+import com.curiofeed.backend.domain.entity.DifficultyLevel;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,7 +69,6 @@ class ArticleFeedRepositoryTest {
         setField(article, "category", cat);
         setField(article, "publishedAt", publishedAt);
         setField(article, "status", status);
-        setField(article, "thumbnailUrl", "https://example.com/thumb/" + slug + ".jpg");
         em.persist(article);
         return article;
     }
@@ -109,7 +109,16 @@ class ArticleFeedRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        category = createCategory("tech", "Technology");
+        // Clean Flyway-seeded data so count-based assertions work correctly
+        em.createQuery("DELETE FROM Quiz").executeUpdate();
+        em.createQuery("DELETE FROM Vocabulary").executeUpdate();
+        em.createQuery("DELETE FROM ArticleContent").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationSubJob").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationJob").executeUpdate();
+        em.createQuery("DELETE FROM Article").executeUpdate();
+        em.createQuery("DELETE FROM Category").executeUpdate();
+
+        category = createCategory("test-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8), "Technology");
 
         Instant base = Instant.parse("2026-03-01T00:00:00Z");
 
@@ -139,7 +148,7 @@ class ArticleFeedRepositoryTest {
     @DisplayName("PUBLISHED 상태의 기사만 조회한다")
     void shouldReturnOnlyPublishedArticles() {
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         assertThat(results).hasSize(5);
     }
@@ -148,7 +157,7 @@ class ArticleFeedRepositoryTest {
     @DisplayName("publishedAt DESC, id DESC 순서로 정렬된다")
     void shouldOrderByPublishedAtDescThenIdDesc() {
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         for (int i = 0; i < results.size() - 1; i++) {
             Instant current = results.get(i).getPublishedAt();
@@ -161,7 +170,7 @@ class ArticleFeedRepositoryTest {
     @DisplayName("요청한 size만큼만 반환한다")
     void shouldRespectPageSize() {
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 3));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 3));
 
         assertThat(results).hasSize(3);
     }
@@ -171,7 +180,7 @@ class ArticleFeedRepositoryTest {
     void shouldReturnArticlesBeforeCursor() {
         // Get first page to extract cursor
         List<ArticleFeedResponse> firstPage = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 2));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 2));
 
         ArticleFeedResponse lastItem = firstPage.get(firstPage.size() - 1);
         Instant cursorAt = lastItem.getPublishedAt();
@@ -179,7 +188,7 @@ class ArticleFeedRepositoryTest {
 
         // Get second page via cursor
         List<ArticleFeedResponse> secondPage = feedRepository.findFeedByCursor(
-                ArticleStatus.PUBLISHED, cursorAt, cursorId, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, cursorAt, cursorId, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         assertThat(secondPage).isNotEmpty();
         for (ArticleFeedResponse item : secondPage) {
@@ -205,7 +214,7 @@ class ArticleFeedRepositoryTest {
         assertThat(a2.getId()).isGreaterThan(a1.getId());
 
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         // Find the two same-time results
         List<ArticleFeedResponse> sameTimeResults = results.stream()
@@ -232,7 +241,7 @@ class ArticleFeedRepositoryTest {
         UUID cursorId = a3.getId();
 
         List<ArticleFeedResponse> results = feedRepository.findFeedByCursor(
-                ArticleStatus.PUBLISHED, sameTime, cursorId, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, sameTime, cursorId, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         // Should return the other sameTime articles + earlier articles, but NOT the cursor itself
         List<String> returnedIds = results.stream()
@@ -252,7 +261,7 @@ class ArticleFeedRepositoryTest {
     @DisplayName("Category JOIN으로 displayName을 정확히 반환한다")
     void shouldJoinCategoryAndReturnDisplayName() {
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 1));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 1));
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getCategoryName()).isEqualTo("Technology");
@@ -269,7 +278,7 @@ class ArticleFeedRepositoryTest {
         em.clear();
 
         List<ArticleFeedResponse> results = feedRepository.findFeedFirstPage(
-                ArticleStatus.PUBLISHED, PageRequest.of(0, 100));
+                ArticleStatus.PUBLISHED, DifficultyLevel.MEDIUM, PageRequest.of(0, 100));
 
         assertThat(results).isEmpty();
     }

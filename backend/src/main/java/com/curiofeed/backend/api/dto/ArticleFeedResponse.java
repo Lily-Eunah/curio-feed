@@ -15,7 +15,7 @@ public class ArticleFeedResponse {
     
     private String id;
     private String title;
-    private String thumbnailUrl;
+    private String excerpt;
     private String categoryName;
     private String sourceName;
     private Instant publishedAt;
