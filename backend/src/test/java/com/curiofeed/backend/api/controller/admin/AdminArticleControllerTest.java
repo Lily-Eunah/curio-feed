@@ -51,12 +51,24 @@ class AdminArticleControllerTest {
     private ArticleGenerationSubJobRepository subJobRepository;
 
     @Autowired
+    private ArticleGenerationStepJobRepository stepJobRepository;
+
+    @Autowired
     private EntityManager em;
 
     private Category category;
 
     @BeforeEach
     void setUp() {
+        // Clean seeded data so count-based assertions are not affected by Flyway seed data
+        em.createQuery("DELETE FROM Quiz").executeUpdate();
+        em.createQuery("DELETE FROM Vocabulary").executeUpdate();
+        em.createQuery("DELETE FROM ArticleContent").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationStepJob").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationSubJob").executeUpdate();
+        em.createQuery("DELETE FROM ArticleGenerationJob").executeUpdate();
+        em.createQuery("DELETE FROM Article").executeUpdate();
+        em.createQuery("DELETE FROM Category").executeUpdate();
         category = newInstance(Category.class);
         setField(category, "name", "tech-" + UUID.randomUUID());
         setField(category, "displayName", "Technology");
@@ -102,6 +114,16 @@ class AdminArticleControllerTest {
         List<ArticleGenerationSubJob> subJobs = subJobRepository.findAll();
         assertThat(subJobs).hasSize(3);
         assertThat(subJobs).allMatch(s -> s.getStatus() == JobStatus.PENDING);
+
+        // Each sub-job should have exactly 3 step jobs pre-created (CONTENT, VOCABULARY, QUIZ)
+        List<ArticleGenerationStepJob> stepJobs = stepJobRepository.findAll();
+        assertThat(stepJobs).hasSize(9); // 3 sub-jobs × 3 steps
+        assertThat(stepJobs).allMatch(s -> s.getStatus() == JobStatus.PENDING);
+        assertThat(stepJobs.stream().map(ArticleGenerationStepJob::getStepType).toList())
+                .containsExactlyInAnyOrder(
+                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
+                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
+                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ);
     }
 
     @Test
@@ -143,7 +165,11 @@ class AdminArticleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.articleId").value(articleId))
                 .andExpect(jsonPath("$.articleStatus").value("DRAFT"))
-                .andExpect(jsonPath("$.job.subJobs.length()").value(3));
+                .andExpect(jsonPath("$.job.subJobs.length()").value(3))
+                .andExpect(jsonPath("$.job.subJobs[0].subJobId").isNotEmpty())
+                .andExpect(jsonPath("$.job.subJobs[0].level").isNotEmpty())
+                .andExpect(jsonPath("$.job.subJobs[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.job.subJobs[0].retryCount").value(0));
     }
 
     @Test
@@ -209,7 +235,193 @@ class AdminArticleControllerTest {
                 .andExpect(jsonPath("$.message").value("SubJob is not in FAILED state"));
     }
 
+    // ── List Articles Tests ───────────────────────────────────────────────
+
+    @Test
+    @DisplayName("GET /api/admin/articles - 빈 목록: 페이지 응답 content 비어있음")
+    void listArticles_empty() throws Exception {
+        mockMvc.perform(get("/api/admin/articles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/admin/articles - 등록된 기사 1건 조회")
+    void listArticles_returnsRegisteredArticle() throws Exception {
+        String url = "https://example.com/list-test-" + UUID.randomUUID();
+        mockMvc.perform(post("/api/admin/articles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerArticleJson(url)))
+                .andExpect(status().isCreated());
+
+        em.flush(); em.clear();
+
+        mockMvc.perform(get("/api/admin/articles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].originalTitle").value("AI is changing the world"))
+                .andExpect(jsonPath("$.content[0].sourceName").value("TechNews"))
+                .andExpect(jsonPath("$.content[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.content[0].categoryName").value("Technology"))
+                .andExpect(jsonPath("$.content[0].id").isNotEmpty())
+                .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/admin/articles?status=DRAFT - status 필터링")
+    void listArticles_filterByStatus() throws Exception {
+        String url = "https://example.com/status-filter-" + UUID.randomUUID();
+        mockMvc.perform(post("/api/admin/articles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerArticleJson(url)))
+                .andExpect(status().isCreated());
+
+        em.flush(); em.clear();
+
+        // DRAFT status should return the article
+        mockMvc.perform(get("/api/admin/articles").param("status", "DRAFT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1));
+
+        // PUBLISHED status should return empty
+        mockMvc.perform(get("/api/admin/articles").param("status", "PUBLISHED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/admin/articles?page=0&size=1 - 페이지 크기 제한")
+    void listArticles_pagination() throws Exception {
+        String url1 = "https://example.com/page-1-" + UUID.randomUUID();
+        String url2 = "https://example.com/page-2-" + UUID.randomUUID();
+        mockMvc.perform(post("/api/admin/articles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerArticleJson(url1)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/admin/articles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerArticleJson(url2)))
+                .andExpect(status().isCreated());
+
+        em.flush(); em.clear();
+
+        mockMvc.perform(get("/api/admin/articles")
+                        .param("page", "0")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    // ── Update Status Tests ──────────────────────────────────────────────
+
+    private String createArticleAndGetId() throws Exception {
+        String url = "https://example.com/status-" + UUID.randomUUID();
+        String response = mockMvc.perform(post("/api/admin/articles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerArticleJson(url)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        em.flush(); em.clear();
+        return response.replaceAll(".*\"articleId\":\"([^\"]+)\".*", "$1");
+    }
+
+    private String statusJson(String status) {
+        return "{\"status\":\"" + status + "\"}";
+    }
+
+    @Test
+    @DisplayName("PATCH /api/admin/articles/{id}/status - DRAFT → PUBLISHED 성공")
+    void updateStatus_draftToPublished() throws Exception {
+        String articleId = createArticleAndGetId();
+
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("PUBLISHED")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.articleId").isNotEmpty());
+
+        em.flush(); em.clear();
+
+        // Verify persisted
+        var article = articleRepository.findById(UUID.fromString(articleId)).orElseThrow();
+        assertThat(article.getStatus()).isEqualTo(ArticleStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("PATCH /api/admin/articles/{id}/status - PUBLISHED → HIDDEN 성공")
+    void updateStatus_publishedToHidden() throws Exception {
+        String articleId = createArticleAndGetId();
+
+        // First: DRAFT → PUBLISHED
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("PUBLISHED")))
+                .andExpect(status().isOk());
+        em.flush(); em.clear();
+
+        // Then: PUBLISHED → HIDDEN
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("HIDDEN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("HIDDEN"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/admin/articles/{id}/status - HIDDEN → PUBLISHED 복원")
+    void updateStatus_hiddenToPublished() throws Exception {
+        String articleId = createArticleAndGetId();
+
+        // DRAFT → PUBLISHED → HIDDEN
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("PUBLISHED")))
+                .andExpect(status().isOk());
+        em.flush(); em.clear();
+
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("HIDDEN")))
+                .andExpect(status().isOk());
+        em.flush(); em.clear();
+
+        // HIDDEN → PUBLISHED
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("PUBLISHED")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/admin/articles/{id}/status - 허용되지 않는 전환 (DRAFT → HIDDEN): 400")
+    void updateStatus_invalidTransition() throws Exception {
+        String articleId = createArticleAndGetId();
+
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("HIDDEN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid status transition")));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/admin/articles/{id}/status - 존재하지 않는 article: 404")
+    void updateStatus_notFound() throws Exception {
+        mockMvc.perform(patch("/api/admin/articles/{id}/status", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson("PUBLISHED")))
+                .andExpect(status().isNotFound());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
+
 
     @SuppressWarnings("unchecked")
     private <T> T newInstance(Class<T> clazz) {

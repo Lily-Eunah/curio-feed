@@ -3,11 +3,11 @@ package com.curiofeed.backend.api.dto.admin;
 import java.time.Instant;
 import java.util.UUID;
 
-public record RegisterArticleRequest(
+public record AdminArticleListResponse(
+        UUID id,
         String originalTitle,
         String sourceName,
-        String sourceUrl,
-        String originalContent,
-        Instant originalPublishedAt,
-        UUID categoryId
+        String status,
+        String categoryName,
+        Instant createdAt
 ) {}
