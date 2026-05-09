@@ -11,7 +11,8 @@ public record PipelineProperties(
         int staleJobThresholdMinutes,
         long schedulerFixedDelayMs,
         int schedulerBatchSize,
-        Map<String, Double> scoreThresholds
+        Map<String, Double> scoreThresholds,
+        boolean useThreeStep
 ) {
     public double thresholdFor(DifficultyLevel level) {
         if (scoreThresholds == null) return 0.7;
