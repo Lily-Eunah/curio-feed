@@ -54,7 +54,7 @@ class ArticleDetailRepositoryTest {
     void setUp() {
         // Category
         Category category = newInstance(Category.class);
-        setField(category, "name", "tech");
+        setField(category, "name", "test-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
         setField(category, "displayName", "Technology");
         setField(category, "active", true);
         setField(category, "sortOrder", 1);
@@ -71,7 +71,6 @@ class ArticleDetailRepositoryTest {
         setField(published, "category", category);
         setField(published, "publishedAt", Instant.now());
         setField(published, "status", ArticleStatus.PUBLISHED);
-        setField(published, "thumbnailUrl", "https://example.com/thumb.jpg");
         setField(published, "viewCount", 0L);
         em.persist(published);
         publishedArticleId = published.getId();
@@ -126,7 +125,6 @@ class ArticleDetailRepositoryTest {
         setField(draft, "category", category);
         setField(draft, "publishedAt", Instant.now());
         setField(draft, "status", ArticleStatus.DRAFT);
-        setField(draft, "thumbnailUrl", "https://example.com/draft-thumb.jpg");
         setField(draft, "viewCount", 0L);
         em.persist(draft);
         draftArticleId = draft.getId();
