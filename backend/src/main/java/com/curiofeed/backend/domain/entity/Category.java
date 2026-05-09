@@ -38,4 +38,22 @@ public class Category extends BaseEntity {
 
     @Column(nullable = false)
     private int sortOrder;
+
+    public Category(String name, String displayName, int sortOrder, boolean active) {
+        this.name = name;
+        this.displayName = displayName;
+        this.sortOrder = sortOrder;
+        this.active = active;
+    }
+
+    public void update(String name, String displayName, int sortOrder, boolean active) {
+        this.name = name;
+        this.displayName = displayName;
+        this.sortOrder = sortOrder;
+        this.active = active;
+    }
+
+    public void deactivate() {
+        this.active = false;
+    }
 }
