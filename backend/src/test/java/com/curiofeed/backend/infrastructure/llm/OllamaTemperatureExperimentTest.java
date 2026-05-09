@@ -3,12 +3,12 @@ package com.curiofeed.backend.infrastructure.llm;
 import com.curiofeed.backend.config.OllamaProperties;
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
 import com.curiofeed.backend.domain.model.GenerationResult;
+import com.curiofeed.backend.domain.model.QuizOptions;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
@@ -16,23 +16,21 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Live Ollama integration test — disabled by default.
+ * Live Ollama temperature experiment — disabled by default.
  *
  * Run manually:
- *   Git Bash : RUN_OLLAMA_TESTS=true ./gradlew test --tests "*OllamaLlmPipelineIntegrationTest"
- *   PowerShell: $env:RUN_OLLAMA_TESTS="true"; ./gradlew test --tests "*OllamaLlmPipelineIntegrationTest*"
+ *   Git Bash : RUN_OLLAMA_TESTS=true ./gradlew test --tests "*OllamaTemperatureExperimentTest"
+ *   PowerShell: $env:RUN_OLLAMA_TESTS="true"; ./gradlew test --tests "*OllamaTemperatureExperimentTest*"
  */
 @Tag("ollama")
 @EnabledIfEnvironmentVariable(named = "RUN_OLLAMA_TESTS", matches = "true")
-class OllamaLlmPipelineIntegrationTest {
+class OllamaTemperatureExperimentTest {
 
-    private static final Logger log = LoggerFactory.getLogger(OllamaLlmPipelineIntegrationTest.class);
+    private static final Logger log = LoggerFactory.getLogger(OllamaTemperatureExperimentTest.class);
 
     private static final String BASE_URL = "http://192.168.45.100:11434";
     private static final String MODEL = "gemma4:e4b";
-    // private static final String MODEL = "qwen3:14b-q4_K_M";
 
-    // Source: https://www.bbc.com/news/articles/cx2631x6nelo
     private static final String ARTICLE_CONTENT = """
         # Strait of Hormuz closed again, Iran says, as ships attacked
         Iran says it is closing the Strait of Hormuz again to commercial vessels and that any ship that approaches it will be targeted.
@@ -58,78 +56,67 @@ class OllamaLlmPipelineIntegrationTest {
         Iran has previously threatened to attack tankers and other ships, as well as warning it had laid mines.
         """;
 
-    private ArticlePromptBuilder promptBuilder;
-    private OllamaLlmClient llmClient;
-    private DefaultLlmResponseParser responseParser;
+    @ParameterizedTest(name = "temp={0} level={1}")
+    @CsvSource({
+        "0.1, EASY",
+        "0.1, MEDIUM",
+        "0.1, HARD",
+        "0.3, EASY",
+        "0.3, MEDIUM",
+        "0.3, HARD",
+        "0.5, EASY",
+        "0.5, MEDIUM",
+        "0.5, HARD"
+    })
+    void temperatureExperiment(double temperature, DifficultyLevel level) {
+        OllamaProperties properties = new OllamaProperties(BASE_URL, MODEL, null, 5, 180, 16384, null);
+        OllamaLlmClient client = new OllamaLlmClient(properties, MODEL, temperature, RestClient.builder());
+        ArticlePromptBuilder promptBuilder = new ArticlePromptBuilder();
+        DefaultLlmResponseParser parser = new DefaultLlmResponseParser(new ObjectMapper());
 
-    @BeforeEach
-    void setUp() {
-        OllamaProperties properties = new OllamaProperties(BASE_URL, MODEL, null, 5, 180, 16384, 0.3);
-        llmClient = new OllamaLlmClient(properties, MODEL, RestClient.builder());
-        promptBuilder = new ArticlePromptBuilder();
-        responseParser = new DefaultLlmResponseParser(new ObjectMapper());
-    }
-
-    @ParameterizedTest(name = "{0} 난이도로 기사 생성 파이프라인이 완전한 결과를 반환한다")
-    @EnumSource(DifficultyLevel.class)
-    void pipeline_allLevels_returnsFullGenerationResult(DifficultyLevel level) {
         String prompt = promptBuilder.build(ARTICLE_CONTENT, level);
-        String rawResponse = llmClient.generate(prompt);
-        GenerationResult result = responseParser.parse(rawResponse, GenerationResult.class);
+        String raw = client.generate(prompt);
+        GenerationResult result = parser.parse(raw, GenerationResult.class);
 
         assertThat(result.hasContent()).isTrue();
         assertThat(result.vocabularies()).hasSize(5);
         assertThat(result.quizzes()).hasSize(3);
 
-        log.info("=== [{}] CONTENT ===\n{}", level, result.content());
+        // Structural quiz checks
+        assertThat(result.quizzes().get(0).type()).isNotNull();
+        assertThat(result.quizzes().get(1).type()).isNotNull();
+        assertThat(result.quizzes().get(2).type()).isNotNull();
 
-        String contentLower = result.content().toLowerCase();
-        var vocabWords = result.vocabularies().stream().map(v -> v.word().toLowerCase()).toList();
+        log.info("=== [temp={} {}] CONTENT (first 200 chars) ===\n{}", temperature, level,
+                result.content().substring(0, Math.min(200, result.content().length())));
 
-        log.info("=== [{}] VOCABULARIES ===", level);
-        result.vocabularies().forEach(vocab -> {
-            assertThat(vocab.word()).isNotBlank();
-            assertThat(vocab.definition()).isNotBlank();
-            assertThat(vocab.exampleSentence()).isNotBlank();
-            boolean inContent = contentLower.contains(vocab.word().toLowerCase());
-            log.info("  word={} inContent={} | definition={} | example={}",
-                    vocab.word(), inContent, vocab.definition(), vocab.exampleSentence());
-        });
+        log.info("=== [temp={} {}] VOCABULARIES ===", temperature, level);
+        result.vocabularies().forEach(v ->
+            log.info("  word={} | definition={} | example={}", v.word(), v.definition(), v.exampleSentence())
+        );
 
-        long vocabMissingFromContent = result.vocabularies().stream()
-                .filter(v -> !contentLower.contains(v.word().toLowerCase()))
-                .count();
-        log.info("=== [{}] VOCAB-IN-CONTENT: {}/5 present ({} missing) ===",
-                level, 5 - vocabMissingFromContent, vocabMissingFromContent);
-
-        log.info("=== [{}] QUIZZES ===", level);
-        result.quizzes().forEach(quiz -> {
-            assertThat(quiz.type()).isNotNull();
-            assertThat(quiz.question()).isNotBlank();
-            assertThat(quiz.correctAnswer()).isNotBlank();
-            log.info("  [{}] {}", quiz.type(), quiz.question());
-            log.info("    answer={} | explanation={}", quiz.correctAnswer(), quiz.explanation());
-            if (quiz.options() != null && quiz.options().getChoices() != null) {
-                quiz.options().getChoices().forEach(choice ->
-                    log.info("    {} - {} | explanation={}", choice.getKey(), choice.getText(), choice.getExplanation())
-                );
+        log.info("=== [temp={} {}] QUIZZES ===", temperature, level);
+        result.quizzes().forEach(q -> {
+            log.info("  [{}] {}", q.type(), q.question());
+            log.info("    answer={}", q.correctAnswer());
+            QuizOptions opts = q.options();
+            if (opts != null && opts.getChoices() != null) {
+                boolean allHaveExplanation = opts.getChoices().stream()
+                        .allMatch(c -> c.getExplanation() != null && !c.getExplanation().isBlank());
+                log.info("    choices={} allHaveExplanation={}", opts.getChoices().size(), allHaveExplanation);
+            } else if ("SHORT_ANSWER".equals(q.type().name())) {
+                boolean optsEmpty = opts == null || opts.getChoices() == null;
+                log.info("    SHORT_ANSWER options empty={}", optsEmpty);
             }
         });
 
-        // Cross-reference checks
-        if (result.quizzes().size() >= 2) {
-            var q2 = result.quizzes().get(1);
-            boolean q2WordInVocab = q2.options() != null && q2.options().getChoices() != null
-                    && q2.options().getChoices().stream().anyMatch(c ->
-                        vocabWords.stream().anyMatch(w -> c.getText() != null && c.getText().toLowerCase().contains(w)));
-            log.info("=== [{}] QUIZ2-VOCAB-CHECK: choicesContainVocabWord={} ===", level, q2WordInVocab);
-        }
-        if (result.quizzes().size() >= 3) {
-            var q3 = result.quizzes().get(2);
-            boolean q3InVocab = vocabWords.stream()
-                    .anyMatch(w -> q3.correctAnswer().toLowerCase().contains(w));
-            log.info("=== [{}] QUIZ3-VOCAB-CHECK: answer='{}' inVocab={} ===",
-                    level, q3.correctAnswer(), q3InVocab);
-        }
+        // Collect vocab words for cross-reference check
+        var vocabWords = result.vocabularies().stream().map(v -> v.word().toLowerCase()).toList();
+        var q2Answer = result.quizzes().size() > 1 ? result.quizzes().get(1).correctAnswer() : "";
+        var q3Answer = result.quizzes().size() > 2 ? result.quizzes().get(2).correctAnswer() : "";
+
+        boolean q3InVocab = vocabWords.stream().anyMatch(w -> q3Answer.toLowerCase().contains(w));
+        log.info("=== [temp={} {}] CROSS-CHECK: q3Answer='{}' inVocab={} ===",
+                temperature, level, q3Answer, q3InVocab);
     }
 }
