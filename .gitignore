@@ -15,3 +15,8 @@ reference/
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Build artifacts
+bin/
+**/bin/
+

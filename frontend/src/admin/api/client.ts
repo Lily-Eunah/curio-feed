@@ -1,4 +1,5 @@
 import { request, ApiError } from '../../api/client';
+import { getApiBaseUrl } from '../../api/baseUrl';
 import type {
   AdminArticleDetailResponse,
   AdminArticleListPage,
@@ -79,7 +80,7 @@ export async function retrySubJob(
   jobId: string,
   subJobId: string,
 ): Promise<void> {
-  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
+  const base = getApiBaseUrl();
   const res = await fetch(
     `${base}/api/admin/articles/${articleId}/generation-jobs/${jobId}/sub-jobs/${subJobId}/retry`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
@@ -98,7 +99,7 @@ export async function retryStep(
   subJobId: string,
   stepType: string,
 ): Promise<void> {
-  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
+  const base = getApiBaseUrl();
   const res = await fetch(
     `${base}/api/admin/articles/${articleId}/generation-jobs/${jobId}/sub-jobs/${subJobId}/steps/${stepType}/retry`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },

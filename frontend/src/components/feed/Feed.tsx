@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { COLORS, CATEGORIES } from '../../theme';
 import type { Article, DifficultyLevel, ContinueReadingState } from '../../types';
 import NavBar from '../ui/NavBar';
@@ -14,6 +14,9 @@ type Screen = 'feed' | 'saved' | 'me';
 
 interface Props {
   articles: Article[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   userLevel: DifficultyLevel;
   selectedCategory: string;
   savedIds: string[];
@@ -38,22 +41,9 @@ function getGroupLabel(dateStr: string): string {
 }
 
 export default function Feed({
-  articles, userLevel, selectedCategory, savedIds, readIds, visitedIds,
+  articles, loading, error, onRetry, userLevel, selectedCategory, savedIds, readIds, visitedIds,
   continueReading, onArticleTap, onCategoryChange, onLevelSheetOpen, onNavigate, onSave,
 }: Props) {
-  const [loading, setLoading] = useState(true);
-
-  // Skeleton on initial mount and category change
-  useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
 
   const filtered = useMemo(
     () => articles.filter(a => selectedCategory === 'All' || a.category === selectedCategory),
@@ -143,6 +133,24 @@ export default function Feed({
             <SkeletonCard />
             <SkeletonCard />
           </>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <p style={{ color: COLORS.textSec, marginBottom: 16 }}>{error}</p>
+            <button
+              onClick={onRetry}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 20,
+                background: COLORS.accent,
+                color: '#fff',
+                border: 'none',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <EmptyFeed selectedCategory={selectedCategory} onCategoryChange={onCategoryChange} />
         ) : (
