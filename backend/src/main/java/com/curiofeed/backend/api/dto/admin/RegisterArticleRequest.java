@@ -9,6 +9,5 @@ public record RegisterArticleRequest(
         String sourceUrl,
         String originalContent,
         Instant originalPublishedAt,
-        UUID categoryId,
-        String thumbnailUrl
+        UUID categoryId
 ) {}

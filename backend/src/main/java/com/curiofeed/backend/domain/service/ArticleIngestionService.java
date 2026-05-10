@@ -8,7 +8,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +18,7 @@ public class ArticleIngestionService {
     private final ArticleRepository articleRepository;
     private final ArticleGenerationJobRepository jobRepository;
     private final ArticleGenerationSubJobRepository subJobRepository;
+    private final ArticleGenerationStepJobRepository stepJobRepository;
     private final CategoryRepository categoryRepository;
     private final SlugGenerator slugGenerator;
 
@@ -26,11 +26,13 @@ public class ArticleIngestionService {
             ArticleRepository articleRepository,
             ArticleGenerationJobRepository jobRepository,
             ArticleGenerationSubJobRepository subJobRepository,
+            ArticleGenerationStepJobRepository stepJobRepository,
             CategoryRepository categoryRepository,
             SlugGenerator slugGenerator) {
         this.articleRepository = articleRepository;
         this.jobRepository = jobRepository;
         this.subJobRepository = subJobRepository;
+        this.stepJobRepository = stepJobRepository;
         this.categoryRepository = categoryRepository;
         this.slugGenerator = slugGenerator;
     }
@@ -63,63 +65,33 @@ public class ArticleIngestionService {
             throw new ArticleAlreadyExistsException("Article already exists", race.getId());
         }
 
-        // 4. Job + SubJob 3개 생성
+        // 4. Job + SubJob 3개 생성, 각 SubJob에 3개 StepJob 즉시 생성
         ArticleGenerationJob job = new ArticleGenerationJob(article.getId(), JobStatus.PENDING);
         jobRepository.save(job);
 
         for (DifficultyLevel level : List.of(DifficultyLevel.EASY, DifficultyLevel.MEDIUM, DifficultyLevel.HARD)) {
-            subJobRepository.save(new ArticleGenerationSubJob(job, level, JobStatus.PENDING));
+            ArticleGenerationSubJob subJob = new ArticleGenerationSubJob(job, level, JobStatus.PENDING);
+            subJobRepository.save(subJob);
+            // Pre-create all 3 step jobs so the Admin UI shows them immediately.
+            // The worker uses these if they exist, or creates them if somehow missing (idempotent).
+            for (GenerationStepType stepType : GenerationStepType.values()) {
+                stepJobRepository.save(ArticleGenerationStepJob.pending(subJob, stepType));
+            }
         }
 
         return new RegisterArticleResponse(article.getId(), job.getId(), JobStatus.PENDING.name());
     }
 
     private Article createArticle(RegisterArticleRequest req, Category category, String slug) {
-        Article article = newInstance(Article.class);
-        setField(article, "originalTitle", req.originalTitle());
-        setField(article, "sourceName", req.sourceName());
-        setField(article, "sourceUrl", req.sourceUrl());
-        setField(article, "originalContent", req.originalContent());
-        setField(article, "originalPublishedAt", req.originalPublishedAt());
-        setField(article, "title", req.originalTitle());
-        setField(article, "slug", slug);
-        setField(article, "category", category);
-        setField(article, "publishedAt", req.originalPublishedAt());
-        setField(article, "status", ArticleStatus.DRAFT);
-        setField(article, "thumbnailUrl", req.thumbnailUrl());
-        return article;
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> T newInstance(Class<T> clazz) {
-        try {
-            var constructor = clazz.getDeclaredConstructor();
-            constructor.setAccessible(true);
-            return constructor.newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            Field field = findField(target.getClass(), fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set field: " + fieldName, e);
-        }
-    }
-
-    private Field findField(Class<?> clazz, String fieldName) {
-        while (clazz != null) {
-            try {
-                return clazz.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        throw new RuntimeException("Field not found: " + fieldName);
+        return Article.create(
+                req.originalTitle(),
+                req.sourceName(),
+                req.sourceUrl(),
+                req.originalContent(),
+                req.originalPublishedAt(),
+                category,
+                slug
+        );
     }
 
     // ── Inner exception ──────────────────────────────────────────────────────

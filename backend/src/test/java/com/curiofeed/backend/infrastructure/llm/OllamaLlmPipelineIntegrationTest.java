@@ -5,14 +5,25 @@ import com.curiofeed.backend.domain.entity.DifficultyLevel;
 import com.curiofeed.backend.domain.model.GenerationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Live Ollama integration test — disabled by default.
+ *
+ * Run manually:
+ *   Git Bash : RUN_OLLAMA_TESTS=true ./gradlew test --tests "*OllamaLlmPipelineIntegrationTest"
+ *   PowerShell: $env:RUN_OLLAMA_TESTS="true"; ./gradlew test --tests "*OllamaLlmPipelineIntegrationTest*"
+ */
+@Tag("ollama")
+@EnabledIfEnvironmentVariable(named = "RUN_OLLAMA_TESTS", matches = "true")
 class OllamaLlmPipelineIntegrationTest {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaLlmPipelineIntegrationTest.class);
@@ -53,7 +64,7 @@ class OllamaLlmPipelineIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        OllamaProperties properties = new OllamaProperties(BASE_URL, MODEL, null, 5, 180);
+        OllamaProperties properties = new OllamaProperties(BASE_URL, MODEL, null, 5, 180, 16384, 0.3);
         llmClient = new OllamaLlmClient(properties, MODEL, RestClient.builder());
         promptBuilder = new ArticlePromptBuilder();
         responseParser = new DefaultLlmResponseParser(new ObjectMapper());
@@ -72,13 +83,24 @@ class OllamaLlmPipelineIntegrationTest {
 
         log.info("=== [{}] CONTENT ===\n{}", level, result.content());
 
+        String contentLower = result.content().toLowerCase();
+        var vocabWords = result.vocabularies().stream().map(v -> v.word().toLowerCase()).toList();
+
         log.info("=== [{}] VOCABULARIES ===", level);
         result.vocabularies().forEach(vocab -> {
             assertThat(vocab.word()).isNotBlank();
             assertThat(vocab.definition()).isNotBlank();
             assertThat(vocab.exampleSentence()).isNotBlank();
-            log.info("  word={} | definition={} | example={}", vocab.word(), vocab.definition(), vocab.exampleSentence());
+            boolean inContent = contentLower.contains(vocab.word().toLowerCase());
+            log.info("  word={} inContent={} | definition={} | example={}",
+                    vocab.word(), inContent, vocab.definition(), vocab.exampleSentence());
         });
+
+        long vocabMissingFromContent = result.vocabularies().stream()
+                .filter(v -> !contentLower.contains(v.word().toLowerCase()))
+                .count();
+        log.info("=== [{}] VOCAB-IN-CONTENT: {}/5 present ({} missing) ===",
+                level, 5 - vocabMissingFromContent, vocabMissingFromContent);
 
         log.info("=== [{}] QUIZZES ===", level);
         result.quizzes().forEach(quiz -> {
@@ -89,9 +111,25 @@ class OllamaLlmPipelineIntegrationTest {
             log.info("    answer={} | explanation={}", quiz.correctAnswer(), quiz.explanation());
             if (quiz.options() != null && quiz.options().getChoices() != null) {
                 quiz.options().getChoices().forEach(choice ->
-                    log.info("    {} - {}", choice.getKey(), choice.getText())
+                    log.info("    {} - {} | explanation={}", choice.getKey(), choice.getText(), choice.getExplanation())
                 );
             }
         });
+
+        // Cross-reference checks
+        if (result.quizzes().size() >= 2) {
+            var q2 = result.quizzes().get(1);
+            boolean q2WordInVocab = q2.options() != null && q2.options().getChoices() != null
+                    && q2.options().getChoices().stream().anyMatch(c ->
+                        vocabWords.stream().anyMatch(w -> c.getText() != null && c.getText().toLowerCase().contains(w)));
+            log.info("=== [{}] QUIZ2-VOCAB-CHECK: choicesContainVocabWord={} ===", level, q2WordInVocab);
+        }
+        if (result.quizzes().size() >= 3) {
+            var q3 = result.quizzes().get(2);
+            boolean q3InVocab = vocabWords.stream()
+                    .anyMatch(w -> q3.correctAnswer().toLowerCase().contains(w));
+            log.info("=== [{}] QUIZ3-VOCAB-CHECK: answer='{}' inVocab={} ===",
+                    level, q3.correctAnswer(), q3InVocab);
+        }
     }
 }

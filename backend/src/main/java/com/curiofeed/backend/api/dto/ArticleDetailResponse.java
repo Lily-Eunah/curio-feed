@@ -17,7 +17,6 @@ public record ArticleDetailResponse(
     String originalTitle,
     String sourceName,
     String sourceUrl,
-    String thumbnailUrl,
     Instant publishedAt,
     String categoryName,
     List<DifficultyLevel> availableLevels,
@@ -25,6 +24,7 @@ public record ArticleDetailResponse(
 ) {
     @Builder
     public record ArticleContentDto(
+        UUID id,
         DifficultyLevel level,
         String content,
         String audioUrl,
@@ -41,8 +41,11 @@ public record ArticleDetailResponse(
 
     @Builder
     public record QuizDto(
+        UUID id,
         QuizType type,
         String question,
-        QuizOptions options
+        QuizOptions options,
+        String correctAnswer,
+        String explanation
     ) {}
 }

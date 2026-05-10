@@ -54,7 +54,7 @@ class ArticleControllerTest {
                 false
         );
 
-        given(feedService.getFeed(any(), eq(10))).willReturn(mockResponse);
+        given(feedService.getFeed(any(), eq(10), eq(DifficultyLevel.MEDIUM))).willReturn(mockResponse);
 
         // when & then
         mockMvc.perform(get("/api/articles"))

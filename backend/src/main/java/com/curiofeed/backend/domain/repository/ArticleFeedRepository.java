@@ -17,7 +17,7 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         SELECT new com.curiofeed.backend.api.dto.ArticleFeedResponse(
             CAST(a.id AS string), 
             a.title, 
-            a.thumbnailUrl, 
+            COALESCE(ac.content, a.originalContent),
             c.displayName, 
             a.sourceName, 
             a.publishedAt, 
@@ -25,6 +25,7 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         )
         FROM Article a
         JOIN a.category c
+        LEFT JOIN ArticleContent ac ON ac.article = a AND ac.level = :level
         WHERE a.status = :status 
         AND (a.publishedAt < :cursorAt OR (a.publishedAt = :cursorAt AND a.id < :cursorId))
         ORDER BY a.publishedAt DESC, a.id DESC
@@ -33,6 +34,7 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         @Param("status") ArticleStatus status,
         @Param("cursorAt") Instant cursorAt,
         @Param("cursorId") UUID cursorId,
+        @Param("level") com.curiofeed.backend.domain.entity.DifficultyLevel level,
         Pageable pageable
     );
 
@@ -40,7 +42,7 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         SELECT new com.curiofeed.backend.api.dto.ArticleFeedResponse(
             CAST(a.id AS string), 
             a.title, 
-            a.thumbnailUrl, 
+            COALESCE(ac.content, a.originalContent),
             c.displayName, 
             a.sourceName, 
             a.publishedAt,
@@ -48,11 +50,13 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         )
         FROM Article a
         JOIN a.category c
+        LEFT JOIN ArticleContent ac ON ac.article = a AND ac.level = :level
         WHERE a.status = :status 
         ORDER BY a.publishedAt DESC, a.id DESC
     """)
     List<ArticleFeedResponse> findFeedFirstPage(
         @Param("status") ArticleStatus status,
+        @Param("level") com.curiofeed.backend.domain.entity.DifficultyLevel level,
         Pageable pageable
     );
 }

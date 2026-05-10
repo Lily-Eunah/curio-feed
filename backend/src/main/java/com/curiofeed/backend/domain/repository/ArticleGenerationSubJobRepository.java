@@ -16,6 +16,9 @@ import java.util.UUID;
 
 @Repository
 public interface ArticleGenerationSubJobRepository extends JpaRepository<ArticleGenerationSubJob, UUID> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"job"})
+    @Query("SELECT s FROM ArticleGenerationSubJob s WHERE s.id = :id")
+    Optional<ArticleGenerationSubJob> findByIdWithJob(@Param("id") UUID id);
 
     Optional<ArticleGenerationSubJob> findByJobIdAndLevel(UUID jobId, DifficultyLevel level);
 

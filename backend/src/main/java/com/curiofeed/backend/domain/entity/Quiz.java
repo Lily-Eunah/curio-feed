@@ -43,7 +43,7 @@ public class Quiz extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private QuizOptions options;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String correctAnswer;
 
     @Column(columnDefinition = "TEXT")

@@ -45,7 +45,6 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
                 .originalTitle(article.getOriginalTitle())
                 .sourceName(article.getSourceName())
                 .sourceUrl(article.getSourceUrl())
-                .thumbnailUrl(article.getThumbnailUrl())
                 .publishedAt(article.getPublishedAt())
                 .categoryName(article.getCategory().getDisplayName())
                 .availableLevels(availableLevels)
@@ -64,13 +63,17 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
 
         List<ArticleDetailResponse.QuizDto> quizzes = content.getQuizzes().stream()
                 .map(q -> ArticleDetailResponse.QuizDto.builder()
+                        .id(q.getId())
                         .type(q.getType())
                         .question(q.getQuestion())
                         .options(q.getOptions())
+                        .correctAnswer(q.getCorrectAnswer())
+                        .explanation(q.getExplanation())
                         .build())
                 .toList();
 
         return ArticleDetailResponse.ArticleContentDto.builder()
+                .id(content.getId())
                 .level(content.getLevel())
                 .content(content.getContent())
                 .audioUrl(content.getAudioUrl())

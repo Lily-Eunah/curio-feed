@@ -8,6 +8,8 @@ public record OllamaProperties(
         String model,
         String fallbackModel,
         int connectTimeoutSeconds,
-        int readTimeoutSeconds
+        int readTimeoutSeconds,
+        int numCtx,
+        Double temperature
 ) {
 }

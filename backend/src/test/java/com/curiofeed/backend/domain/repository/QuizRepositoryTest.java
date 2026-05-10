@@ -55,7 +55,7 @@ class QuizRepositoryTest {
     void setUp() {
         // Category
         Category category = newInstance(Category.class);
-        setField(category, "name", "tech");
+        setField(category, "name", "test-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
         setField(category, "displayName", "Technology");
         setField(category, "active", true);
         setField(category, "sortOrder", 1);
@@ -72,7 +72,6 @@ class QuizRepositoryTest {
         setField(article, "category", category);
         setField(article, "publishedAt", Instant.now());
         setField(article, "status", ArticleStatus.PUBLISHED);
-        setField(article, "thumbnailUrl", "http://example.com/thumb");
         setField(article, "viewCount", 0L);
         em.persist(article);
 

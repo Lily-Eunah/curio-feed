@@ -61,20 +61,40 @@ public class Article extends BaseEntity {
     @Column(nullable = false)
     private ArticleStatus status;
 
-    @Column(nullable = false)
-    private String thumbnailUrl;
-
     @Column(columnDefinition = "TEXT")
     private String originalContent;
 
     @Version
-    private Long version;
+    private long version;
 
     @Column(nullable = false)
     private long viewCount = 0;
 
     @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ArticleContent> contents = new ArrayList<>();
+
+    public static Article create(
+            String originalTitle,
+            String sourceName,
+            String sourceUrl,
+            String originalContent,
+            Instant originalPublishedAt,
+            Category category,
+            String slug
+    ) {
+        Article article = new Article();
+        article.originalTitle = originalTitle;
+        article.sourceName = sourceName;
+        article.sourceUrl = sourceUrl;
+        article.originalContent = originalContent;
+        article.originalPublishedAt = originalPublishedAt;
+        article.title = originalTitle;
+        article.slug = slug;
+        article.category = category;
+        article.publishedAt = originalPublishedAt;
+        article.status = ArticleStatus.DRAFT;
+        return article;
+    }
 
     public void updateStatus(ArticleStatus newStatus) {
         this.status = newStatus;

@@ -25,12 +25,15 @@ ai:
     model: ${OLLAMA_MODEL:gemma4:e4b}
     fallback-model: ${OLLAMA_FALLBACK_MODEL:qwen3:14b-q4_K_M}
     connect-timeout-seconds: 5
-    read-timeout-seconds: 180
+    read-timeout-seconds: 1200
+    num-ctx: 16384
+    temperature: 0.3
   pipeline:
     max-retry-count: 3
     stale-job-threshold-minutes: 10
     scheduler-fixed-delay-ms: 3000
     scheduler-batch-size: 5
+    use-three-step: true
     score-thresholds:
       EASY: 0.65
       MEDIUM: 0.70

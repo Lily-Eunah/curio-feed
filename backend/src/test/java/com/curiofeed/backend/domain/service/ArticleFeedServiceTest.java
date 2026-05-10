@@ -41,7 +41,6 @@ class ArticleFeedServiceTest {
         return ArticleFeedResponse.builder()
                 .id(id)
                 .title("Test Article")
-                .thumbnailUrl("https://example.com/thumb.jpg")
                 .categoryName("Technology")
                 .sourceName("Test Source")
                 .publishedAt(publishedAt)
@@ -71,14 +70,14 @@ class ArticleFeedServiceTest {
         @DisplayName("cursor가 null이면 findFeedFirstPage를 호출한다")
         void shouldReturnFirstPage_whenCursorIsNull() {
             // given
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(createFeedResponses(3));
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
-            verify(feedRepository).findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class));
+            verify(feedRepository).findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class));
             assertThat(response.getData()).hasSize(3);
             assertThat(response.isHasNext()).isFalse();
             assertThat(response.getNextCursor()).isNull();
@@ -88,14 +87,14 @@ class ArticleFeedServiceTest {
         @DisplayName("cursor가 빈 문자열이면 findFeedFirstPage를 호출한다")
         void shouldReturnFirstPage_whenCursorIsBlank() {
             // given
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(createFeedResponses(2));
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed("", 10);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed("", 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
-            verify(feedRepository).findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class));
+            verify(feedRepository).findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class));
             assertThat(response.getData()).hasSize(2);
         }
     }
@@ -118,17 +117,19 @@ class ArticleFeedServiceTest {
                     eq(ArticleStatus.PUBLISHED),
                     eq(cursorAt),
                     eq(cursorId),
+                    eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM),
                     any(PageRequest.class)
             )).thenReturn(createFeedResponses(5));
 
             // when
-            feedService.getFeed(cursorToken, 10);
+            feedService.getFeed(cursorToken, 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
             verify(feedRepository).findFeedByCursor(
                     eq(ArticleStatus.PUBLISHED),
                     eq(cursorAt),
                     eq(cursorId),
+                    eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM),
                     any(PageRequest.class)
             );
         }
@@ -146,11 +147,11 @@ class ArticleFeedServiceTest {
             // given
             int size = 10;
             List<ArticleFeedResponse> elevenResults = createFeedResponses(size + 1);
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(elevenResults);
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, size);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, size, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
             assertThat(response.isHasNext()).isTrue();
@@ -161,11 +162,11 @@ class ArticleFeedServiceTest {
         @DisplayName("결과가 size 이하이면 hasNext=false이고 nextCursor는 null이다")
         void shouldSetHasNextFalse_whenResultsEqualOrLessThanSize() {
             // given
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(createFeedResponses(7));
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
             assertThat(response.isHasNext()).isFalse();
@@ -187,11 +188,11 @@ class ArticleFeedServiceTest {
             // size+1번째 항목 추가 → hasNext=true 트리거
             results.add(createFeedResponse(UUID.randomUUID().toString(), expectedPublishedAt.minusSeconds(3600)));
 
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(results);
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, size);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, size, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
             assertThat(response.getNextCursor())
@@ -209,11 +210,11 @@ class ArticleFeedServiceTest {
         @DisplayName("게시된 기사가 없으면 빈 데이터와 hasNext=false를 반환한다")
         void shouldReturnEmptyData_whenNoArticlesExist() {
             // given
-            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), any(PageRequest.class)))
+            when(feedRepository.findFeedFirstPage(eq(ArticleStatus.PUBLISHED), eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM), any(PageRequest.class)))
                     .thenReturn(Collections.emptyList());
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(null, 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then
             assertThat(response.getData()).isEmpty();
@@ -225,7 +226,7 @@ class ArticleFeedServiceTest {
         @DisplayName("잘못된 cursor 형식이 주어지면 예외가 발생한다")
         void shouldThrowException_whenCursorFormatInvalid() {
             // when & then
-            assertThatThrownBy(() -> feedService.getFeed("invalid-cursor", 10))
+            assertThatThrownBy(() -> feedService.getFeed("invalid-cursor", 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM))
                     .isInstanceOf(Exception.class);
         }
 
@@ -241,11 +242,12 @@ class ArticleFeedServiceTest {
                     eq(ArticleStatus.PUBLISHED),
                     eq(cursorAt),
                     eq(nonExistentId),
+                    eq(com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM),
                     any(PageRequest.class)
             )).thenReturn(Collections.emptyList());
 
             // when
-            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(cursorToken, 10);
+            CursorPageResponse<ArticleFeedResponse> response = feedService.getFeed(cursorToken, 10, com.curiofeed.backend.domain.entity.DifficultyLevel.MEDIUM);
 
             // then — 500 에러 없이 빈 결과를 정상 반환
             assertThat(response.getData()).isEmpty();

@@ -40,7 +40,7 @@ class ArticleDetailServiceTest {
     @BeforeEach
     void setUp() {
         Category category = newInstance(Category.class);
-        setField(category, "name", "tech");
+        setField(category, "name", "test-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
         setField(category, "displayName", "Technology");
 
         mockArticle = newInstance(Article.class);
@@ -49,7 +49,6 @@ class ArticleDetailServiceTest {
         setField(mockArticle, "originalTitle", "Original Title");
         setField(mockArticle, "sourceName", "Test Source");
         setField(mockArticle, "sourceUrl", "http://test.com");
-        setField(mockArticle, "thumbnailUrl", "http://test.com/thumb.jpg");
         setField(mockArticle, "publishedAt", Instant.now());
         setField(mockArticle, "status", ArticleStatus.PUBLISHED);
         setField(mockArticle, "category", category);

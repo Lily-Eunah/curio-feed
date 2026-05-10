@@ -23,4 +23,6 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     Optional<Article> findBySourceUrl(String sourceUrl);
 
     boolean existsBySlug(String slug);
+
+    boolean existsByCategoryId(UUID categoryId);
 }
