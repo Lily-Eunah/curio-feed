@@ -1,5 +1,14 @@
--- V10: Seed sample articles with relative dates for Today, Yesterday, and Older
+-- V2: Seed initial categories and sample articles
+-- Seed Categories
+INSERT INTO categories (id, created_at, updated_at, name, display_name, active, sort_order) VALUES
+('d1c1c1c1-1111-1111-1111-111111111111', NOW(), NOW(), 'Tech', 'Tech', true, 1),
+('d1c1c1c1-2222-2222-2222-222222222222', NOW(), NOW(), 'Science', 'Science', true, 2),
+('d1c1c1c1-3333-3333-3333-333333333333', NOW(), NOW(), 'Business', 'Business', true, 3),
+('d1c1c1c1-4444-4444-4444-444444444444', NOW(), NOW(), 'Culture', 'Culture', true, 4)
+ON CONFLICT (id) DO NOTHING;
+
 -- Article 9: Today (Tech)
+
 INSERT INTO articles (id, created_at, updated_at, original_title, source_name, source_url, original_published_at, title, slug, category_id, published_at, status, original_content) VALUES
 ('a9a9a9a9-9999-9999-9999-999999999999', NOW(), NOW(), 'The Future of Quantum Computing', 'Quantum Daily', 'https://example.com/art-009', NOW(), 'The Future of Quantum Computing', 'quantum-future', 'd1c1c1c1-1111-1111-1111-111111111111', NOW(), 'PUBLISHED', 'Quantum computing is no longer just theoretical. Here is what to expect in the next decade.')
 ON CONFLICT (id) DO NOTHING;
