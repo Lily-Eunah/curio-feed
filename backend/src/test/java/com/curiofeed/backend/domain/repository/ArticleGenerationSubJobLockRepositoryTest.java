@@ -1,10 +1,7 @@
 package com.curiofeed.backend.domain.repository;
 
 import com.curiofeed.backend.config.JpaConfig;
-import com.curiofeed.backend.domain.entity.ArticleGenerationJob;
-import com.curiofeed.backend.domain.entity.ArticleGenerationSubJob;
-import com.curiofeed.backend.domain.entity.DifficultyLevel;
-import com.curiofeed.backend.domain.entity.JobStatus;
+import com.curiofeed.backend.domain.entity.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +44,22 @@ class ArticleGenerationSubJobLockRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        job = new ArticleGenerationJob(UUID.randomUUID(), JobStatus.PENDING);
+        String uniqueSuffix = UUID.randomUUID().toString();
+        Category category = new Category("tech-" + uniqueSuffix, "Technology", 1, true);
+        entityManager.persist(category);
+
+        Article article = Article.create(
+                "AI is changing the world",
+                "TechNews",
+                "https://example.com/ai-news-" + uniqueSuffix,
+                "Content",
+                java.time.Instant.now(),
+                category,
+                "ai-news-" + uniqueSuffix
+        );
+        entityManager.persist(article);
+
+        job = new ArticleGenerationJob(article.getId(), JobStatus.PENDING);
         entityManager.persistAndFlush(job);
     }
 
