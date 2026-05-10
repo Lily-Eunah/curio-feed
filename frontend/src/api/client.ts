@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from './baseUrl';
 import type {
   ArticleDetailDto,
   ApiErrorBody,
@@ -18,12 +19,9 @@ export class ApiError extends Error {
   }
 }
 
-function baseUrl(): string {
-  return (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
-}
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${baseUrl()}${path}`, {
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
