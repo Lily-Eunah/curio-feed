@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { COLORS } from './theme';
-import { ARTICLES } from './data/articles';
+import { fetchFeedArticles, fetchArticleDetail } from './api/client';
+import { mapFeedArticle, mapFullArticle } from './utils/article';
+import type { Article } from './types';
 import type { AppState, DifficultyLevel, MCQResult, ShortAnswerResult, ContinueReadingState } from './types';
 import Toast from './components/ui/Toast';
 
@@ -52,6 +54,9 @@ export default function App() {
   });
   const [screen, setScreen] = useState<Screen>('feed');
   const [currentArticleId, setCurrentArticleId] = useState<string | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [toast, setToast] = useState({ message: '', visible: false });
 
@@ -68,15 +73,40 @@ export default function App() {
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 2200);
   }, []);
 
-  const currentArticle = currentArticleId ? ARTICLES.find(a => a.id === currentArticleId) ?? null : null;
+  const currentArticle = currentArticleId ? articles.find(a => a.id === currentArticleId) ?? null : null;
 
   const getNextArticle = useCallback((articleId: string) => {
-    const idx = ARTICLES.findIndex(a => a.id === articleId);
-    const rest = ARTICLES.slice(idx + 1).filter(a =>
-      appState.selectedCategory === 'All' || a.category === ARTICLES[idx]?.category,
+    const idx = articles.findIndex(a => a.id === articleId);
+    const rest = articles.slice(idx + 1).filter(a =>
+      appState.selectedCategory === 'All' || a.category === articles[idx]?.category,
     );
     return rest[0] ?? null;
-  }, [appState.selectedCategory]);
+  }, [appState.selectedCategory, articles]);
+
+  // ── API Fetching ─────────────────────────────────────────────────────────────
+
+  const loadFeed = useCallback(async () => {
+    if (!appState.onboarded) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetchFeedArticles({
+        level: appState.userLevel,
+        category: appState.selectedCategory,
+        size: 20,
+      });
+      setArticles(resp.data.map(mapFeedArticle));
+    } catch (err) {
+      console.error('Failed to fetch feed:', err);
+      setError('Failed to load articles. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, [appState.onboarded, appState.userLevel, appState.selectedCategory]);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -85,14 +115,26 @@ export default function App() {
     setTimeout(() => setScreen('feed'), 50);
   }, [setAppState]);
 
-  const handleArticleTap = useCallback((id: string) => {
+  const handleArticleTap = useCallback(async (id: string) => {
     setCurrentArticleId(id);
     setScreen('article');
     setAppState(prev => ({
       ...prev,
       visitedIds: prev.visitedIds.includes(id) ? prev.visitedIds : [...prev.visitedIds, id],
     }));
-  }, [setAppState]);
+
+    // Fetch full detail if not already loaded (placeholder check)
+    const existing = articles.find(a => a.id === id);
+    if (existing && existing.body === '') {
+      try {
+        const detail = await fetchArticleDetail(id, appState.userLevel);
+        setArticles(prev => prev.map(a => a.id === id ? mapFullArticle(detail, a) : a));
+      } catch (err) {
+        console.error('Failed to fetch article detail:', err);
+        showToast('Failed to load article details');
+      }
+    }
+  }, [articles, appState.userLevel, setAppState, showToast]);
 
   const handleBack = useCallback(() => {
     setCurrentArticleId(null);
@@ -199,7 +241,10 @@ export default function App() {
         transition: 'opacity 0.2s ease',
       }}>
         <Feed
-          articles={ARTICLES}
+          articles={articles}
+          loading={loading}
+          error={error}
+          onRetry={loadFeed}
           userLevel={appState.userLevel}
           selectedCategory={appState.selectedCategory}
           savedIds={appState.savedIds}
@@ -246,7 +291,7 @@ export default function App() {
         transition: 'opacity 0.2s ease',
       }}>
         <Saved
-          articles={ARTICLES}
+          articles={articles}
           savedIds={appState.savedIds}
           onArticleTap={handleArticleTap}
           onRemove={handleRemoveSaved}
