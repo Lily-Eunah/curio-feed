@@ -182,14 +182,14 @@ export default function App() {
 
   if (!appState.onboarded) {
     return (
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div className="consumer-app-shell">
         <Onboarding onComplete={handleOnboardingComplete} />
       </div>
     );
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: COLORS.bg }}>
+    <div className="consumer-app-shell" style={{ background: COLORS.bg }}>
 
       {/* Feed */}
       <div style={{

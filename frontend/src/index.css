@@ -13,25 +13,41 @@ html, body {
 }
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100vh;
+  margin: 0;
 }
 
 #root {
+  min-height: 100vh;
+}
+
+.consumer-app-shell {
   width: 390px;
   height: min(844px, 100dvh);
   position: relative;
   overflow: hidden;
   background: #FAFAF8;
+  margin: 0 auto;
   border-radius: clamp(0px, calc((100dvh - 844px) * 100), 44px);
   box-shadow: 0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.08);
 }
 
+.admin-app-shell {
+  min-height: 100vh;
+  width: 100%;
+}
+
+@media (min-width: 431px) {
+  body:has(.consumer-app-shell) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 430px) {
   body { background: #FAFAF8; }
-  #root {
+  .consumer-app-shell {
     width: 100%;
     height: 100dvh;
     border-radius: 0;
