@@ -9,9 +9,9 @@ const NAV_ITEMS = [
 
 export default function AdminShell() {
   return (
-    <div className="flex h-screen bg-gray-50" style={{ display: 'flex', height: '100vh' }}>
+    <div className="admin-app-shell flex min-h-screen bg-gray-50 text-slate-950" style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
       {/* Sidebar */}
-      <aside className="flex w-64 flex-col bg-slate-800" style={{ width: '256px', display: 'flex', flexDirection: 'column', backgroundColor: '#1e293b' }}>
+      <aside className="flex w-64 shrink-0 flex-col bg-slate-800" style={{ width: '256px', flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#1e293b' }}>
         <div className="px-6 py-5">
           <div className="text-lg font-bold text-white tracking-tight">CurioFeed Admin</div>
         </div>
@@ -53,7 +53,7 @@ export default function AdminShell() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto p-8">
+      <main className="min-w-0 flex-1 overflow-auto p-8">
         <Outlet />
       </main>
     </div>
