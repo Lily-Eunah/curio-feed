@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { COLORS, CATEGORIES } from '../../theme';
 import type { Article, DifficultyLevel, ContinueReadingState } from '../../types';
 import NavBar from '../ui/NavBar';
