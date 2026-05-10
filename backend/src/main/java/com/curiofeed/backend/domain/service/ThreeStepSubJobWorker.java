@@ -43,6 +43,8 @@ public class ThreeStepSubJobWorker {
     private static final Logger log = LoggerFactory.getLogger(ThreeStepSubJobWorker.class);
     private static final long HEARTBEAT_INTERVAL_SECONDS = 30;
     private static final int MAX_STEP_RETRIES = 3;
+    private static final int LONG_ARTICLE_THRESHOLD_WORDS = 600;
+    private static final int CHUNK_ARTICLE_THRESHOLD_WORDS = 1200; // TODO: Implement chunking for > 1200
 
     private final SubJobLockService lockService;
     private final ArticleGenerationSubJobRepository subJobRepository;
@@ -141,13 +143,32 @@ public class ThreeStepSubJobWorker {
     private void runPipeline(ArticleGenerationSubJob subJob, UUID articleId,
                              DifficultyLevel level, String originalContent) {
         UUID subJobId = subJob.getId();
+        int originalWordCount = countWords(originalContent);
+        boolean isLongArticle = originalWordCount > LONG_ARTICLE_THRESHOLD_WORDS;
+
+        // ── Step 0: SOURCE_DIGEST (Optional) ──────────────────────────────────
+        String sourceText = originalContent;
+        boolean isDigestUsed = false;
+
+        ArticleGenerationStepJob digestStep = getOrCreateStep(subJob, GenerationStepType.SOURCE_DIGEST);
+        if (isLongArticle) {
+            GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalContent);
+            if (digestData == null) return; // hard fail
+            sourceText = formatDigest(digestData);
+            isDigestUsed = true;
+        } else {
+            if (digestStep.getStatus() != JobStatus.SKIPPED) {
+                digestStep.markSkipped("SHORT_ARTICLE");
+                stepJobRepository.save(digestStep);
+            }
+        }
 
         // ── Step 1: CONTENT ───────────────────────────────────────────────────
         ArticleGenerationStepJob contentStep = getOrCreateStep(subJob, GenerationStepType.CONTENT);
         String generatedContent;
 
         if (!contentStep.isCompleted()) {
-            generatedContent = executeContentStep(contentStep, subJob, articleId, level, originalContent);
+            generatedContent = executeContentStep(contentStep, subJob, articleId, level, sourceText, isDigestUsed);
             if (generatedContent == null) return; // hard fail handled inside
         } else {
             generatedContent = contentRepository.findByArticleIdAndLevel(articleId, level)
@@ -197,81 +218,133 @@ public class ThreeStepSubJobWorker {
     private String executeContentStep(ArticleGenerationStepJob step,
                                       ArticleGenerationSubJob subJob,
                                       UUID articleId, DifficultyLevel level,
-                                      String originalContent) {
+                                      String sourceText, boolean isDigestUsed) {
         UUID subJobId = subJob.getId();
-        log.info("[subJob={} level={}] Running CONTENT step", subJobId, level);
+        log.info("[subJob={} level={}] Running CONTENT step (isDigestUsed={})", subJobId, level, isDigestUsed);
         step.markProcessing();
         stepJobRepository.save(step);
 
-        String lastErrors = null;
+        ContentValidationResult lastResult = null;
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
+            Instant start = Instant.now();
             try {
-                // Choose base or corrective prompt
-                String retryReason = classifyContentRetryReason(lastErrors);
                 String prompt = (attempt == 1)
-                        ? promptBuilder.buildContentPrompt(originalContent, level)
-                        : promptBuilder.buildContentRetryPrompt(originalContent, level, retryReason);
+                        ? promptBuilder.buildContentPrompt(sourceText, level, isDigestUsed)
+                        : promptBuilder.buildContentRetryPrompt(sourceText, level, lastResult, isDigestUsed);
 
-                if (attempt > 1) {
-                    log.info("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                    "attempt={} retryPromptReason={}",
-                            articleId, subJobId, level, attempt, retryReason);
-                }
-
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.contentSchema(), subJobId, "CONTENT");
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
+
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=PARSE_START", subJobId, attempt);
                 GenerationResult result = responseParser.parse(raw, GenerationResult.class);
                 String content = result.content();
 
-                List<String> errors = contentValidator.validate(content, level);
-                boolean hardFail = contentValidator.isHardFail(errors);
-                String errStr = errors.isEmpty() ? null : String.join("; ", errors);
+                log.info("[subJob={} level={}] Content validation started", subJobId, level);
+                ContentValidationResult validationResult = contentValidator.validate(content, level);
+                lastResult = validationResult;
+                
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=VALIDATION_RESULT level={} status={} words={} pref={}~{} hard={}~{} retry={}", 
+                        subJobId, attempt, level, validationResult.getStatus(), validationResult.getActualWordCount(), 
+                        validationResult.getPreferredMin(), validationResult.getPreferredMax(),
+                        validationResult.getHardMin(), validationResult.getHardMax(),
+                        validationResult.getRetryReason());
 
-                if (!errors.isEmpty()) {
-                    if (hardFail) {
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                        "attempt={} hardFail=true validationErrors=[{}]",
-                                articleId, subJobId, level, attempt, errStr);
-                        lastErrors = errStr;
-                        if (attempt < MAX_STEP_RETRIES) continue; // retry
-                        // Exhausted all retries
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                        "finalStatus=FAILED totalAttempts={}",
-                                articleId, subJobId, level, attempt);
-                        step.markFailed("Content validation failed after " + attempt + " attempts", errStr);
-                        stepJobRepository.save(step);
-                        markSubJobFailed(subJob);
+                if (!validationResult.isSuccess()) {
+                    if (validationResult.isHardFail()) {
+                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT attempt={} hardFail=true validationStatus={} words={} retryReason={} errors=[{}]",
+                                articleId, subJobId, level, attempt, validationResult.getStatus(), 
+                                validationResult.getActualWordCount(), validationResult.getRetryReason(),
+                                validationResult.getMessage());
+                        if (attempt < MAX_STEP_RETRIES) continue;
+                        markStepFailed(step, subJob, "VALIDATION_ERROR", validationResult.getMessage(), validationResult.getMessage());
                         return null;
-                    } else {
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                        "attempt={} hardFail=false softWarnings=[{}]",
-                                articleId, subJobId, level, attempt, errStr);
                     }
                 }
 
-                // Success
-                saveContentOnly(articleId, level, content);
-                step.markCompleted(hardFail ? "PASS_WITH_WARNINGS" : (errStr != null ? "PASS_WITH_WARNINGS" : "PASS"));
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_START", subJobId, attempt);
+                resultSaver.saveContent(articleId, level, content);
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_COMPLETE", subJobId, attempt);
+
+                step.markCompleted(validationResult.getStatus() != ContentValidationResult.ValidationStatus.VALID ? "PASS_WITH_WARNINGS" : "PASS");
                 stepJobRepository.save(step);
-                log.info("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                "finalStatus=COMPLETED wordCount={} totalAttempts={}",
-                        articleId, subJobId, level, content.trim().split("\\s+").length, attempt);
+                log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
                 return content;
 
             } catch (Exception e) {
-                log.warn("[subJob={} level={}] CONTENT attempt {} FAILED: {}", subJobId, level, attempt, e.getMessage());
-                lastErrors = e.getMessage();
-                if (attempt >= MAX_STEP_RETRIES) {
-                    log.warn("[telemetry] articleId={} subJobId={} level={} stepType=CONTENT " +
-                                    "finalStatus=FAILED totalAttempts={}",
-                            articleId, subJobId, level, attempt);
-                    step.markFailed(e.getMessage(), null);
-                    stepJobRepository.save(step);
-                    markSubJobFailed(subJob);
-                    return null;
-                }
+                handleStepException(step, subJob, "CONTENT", attempt, start, e);
+                // Wrap exception as validation failure to trigger retry
+                lastResult = ContentValidationResult.builder()
+                        .success(false)
+                        .level(level)
+                        .status(ContentValidationResult.ValidationStatus.TOO_SHORT_HARD_FAIL) // treat as hard fail for retry
+                        .retryReason("exception")
+                        .message(e.getMessage())
+                        .errors(List.of(e.getMessage()))
+                        .preferredMin(0).preferredMax(0).hardMin(0).hardMax(0)
+                        .build();
+                if (attempt >= MAX_STEP_RETRIES) return null;
             }
         }
-        return null; // unreachable, but satisfies compiler
+        return null;
+    }
+
+    private GenerationResult.SourceDigestData executeSourceDigestStep(ArticleGenerationStepJob step,
+                                                                      ArticleGenerationSubJob subJob,
+                                                                      String originalContent) {
+        UUID subJobId = subJob.getId();
+        log.info("[subJob={}] Running SOURCE_DIGEST step", subJobId);
+        step.markProcessing();
+        stepJobRepository.save(step);
+
+        for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
+            Instant start = Instant.now();
+            try {
+                String prompt = promptBuilder.buildSourceDigestPrompt(originalContent);
+                log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
+                String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.sourceDigestSchema(), subJobId, "SOURCE_DIGEST");
+                log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms",
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
+
+                log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=PARSE_START", subJobId, attempt);
+                GenerationResult result = responseParser.parse(raw, GenerationResult.class);
+                GenerationResult.SourceDigestData digest = result.sourceDigest();
+
+                if (digest == null || digest.centralStory() == null) {
+                    throw new IllegalStateException("SourceDigest missing from LLM response");
+                }
+
+                step.markCompleted("PASS");
+                stepJobRepository.save(step);
+                log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms",
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
+                return digest;
+
+            } catch (Exception e) {
+                handleStepException(step, subJob, "SOURCE_DIGEST", attempt, start, e);
+                if (attempt >= MAX_STEP_RETRIES) return null;
+            }
+        }
+        return null;
+    }
+
+    private String formatDigest(GenerationResult.SourceDigestData digest) {
+        return """
+                CENTRAL STORY: %s
+                CORE FACTS:
+                - %s
+                SUPPORTING DETAILS:
+                - %s
+                OMITTED DETAILS (for reference):
+                - %s
+                """.formatted(
+                digest.centralStory(),
+                String.join("\n- ", digest.coreFacts()),
+                String.join("\n- ", digest.supportingDetails()),
+                String.join("\n- ", digest.omittedDetails())
+        );
     }
 
     /**
@@ -290,67 +363,52 @@ public class ThreeStepSubJobWorker {
 
         String lastErrors = null;
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
+            Instant start = Instant.now();
             try {
                 String retryReason = classifyVocabRetryReason(lastErrors);
                 String prompt = (attempt == 1)
                         ? promptBuilder.buildVocabularyPrompt(generatedContent, level)
                         : promptBuilder.buildVocabularyRetryPrompt(generatedContent, level, retryReason);
 
-                if (attempt > 1) {
-                    log.info("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                    "attempt={} retryPromptReason={}",
-                            articleId, subJobId, level, attempt, retryReason);
-                }
-
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.vocabularySchema(), subJobId, "VOCAB");
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
+
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=PARSE_START", subJobId, attempt);
                 GenerationResult result = responseParser.parse(raw, GenerationResult.class);
                 List<GenerationResult.VocabularyData> vocabs = result.vocabularies();
 
+                log.info("[subJob={} level={}] Vocab validation started", subJobId, level);
                 List<String> errors = vocabValidator.validate(vocabs, generatedContent);
                 boolean hardFail = vocabValidator.isHardFail(errors);
                 String errStr = errors.isEmpty() ? null : String.join("; ", errors);
 
                 if (!errors.isEmpty()) {
                     if (hardFail) {
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                        "attempt={} hardFail=true validationErrors=[{}]",
+                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY attempt={} hardFail=true validationErrors=[{}]",
                                 articleId, subJobId, level, attempt, errStr);
                         lastErrors = errStr;
                         if (attempt < MAX_STEP_RETRIES) continue;
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                        "finalStatus=FAILED totalAttempts={}",
-                                articleId, subJobId, level, attempt);
-                        step.markFailed("Vocab validation failed after " + attempt + " attempts", errStr);
-                        stepJobRepository.save(step);
-                        markSubJobFailed(subJob);
+                        markStepFailed(step, subJob, "VALIDATION_ERROR", "Validation failed: " + errStr, errStr);
                         return null;
-                    } else {
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                        "attempt={} hardFail=false softWarnings=[{}]",
-                                articleId, subJobId, level, attempt, errStr);
                     }
                 }
 
-                saveVocabOnly(articleId, level, vocabs);
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=SAVE_START", subJobId, attempt);
+                resultSaver.saveVocab(articleId, level, vocabs, vocabLemmatizer);
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=SAVE_COMPLETE", subJobId, attempt);
+
                 step.markCompleted(errStr != null ? "PASS_WITH_WARNINGS" : "PASS");
                 stepJobRepository.save(step);
-                log.info("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                "finalStatus=COMPLETED vocabCount={} totalAttempts={}",
-                        articleId, subJobId, level, vocabs == null ? 0 : vocabs.size(), attempt);
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
                 return vocabs;
 
             } catch (Exception e) {
-                log.warn("[subJob={} level={}] VOCABULARY attempt {} FAILED: {}", subJobId, level, attempt, e.getMessage());
+                handleStepException(step, subJob, "VOCABULARY", attempt, start, e);
                 lastErrors = e.getMessage();
-                if (attempt >= MAX_STEP_RETRIES) {
-                    log.warn("[telemetry] articleId={} subJobId={} level={} stepType=VOCABULARY " +
-                                    "finalStatus=FAILED totalAttempts={}",
-                            articleId, subJobId, level, attempt);
-                    step.markFailed(e.getMessage(), null);
-                    stepJobRepository.save(step);
-                    markSubJobFailed(subJob);
-                    return null;
-                }
+                if (attempt >= MAX_STEP_RETRIES) return null;
             }
         }
         return null;
@@ -376,80 +434,72 @@ public class ThreeStepSubJobWorker {
         String vocabJson = serializeVocab(generatedVocab);
         String lastErrors = null;
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
+            Instant start = Instant.now();
             try {
                 String retryReason = classifyQuizRetryReason(lastErrors);
                 String prompt = (attempt == 1)
                         ? promptBuilder.buildQuizPrompt(generatedContent, vocabJson, level)
                         : promptBuilder.buildQuizRetryPrompt(generatedContent, vocabJson, level, retryReason);
 
-                if (attempt > 1) {
-                    log.info("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                    "attempt={} retryPromptReason={}",
-                            articleId, subJobId, level, attempt, retryReason);
-                }
-
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.quizSchema(), subJobId, "QUIZ");
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
+
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=PARSE_START", subJobId, attempt);
                 GenerationResult result = responseParser.parse(raw, GenerationResult.class);
 
+                log.info("[subJob={} level={}] Quiz validation started", subJobId, level);
                 List<String> errors = quizValidator.validate(result.quizzes(), generatedVocab);
                 boolean hardFail = quizValidator.isHardFail(errors);
                 String errStr = errors.isEmpty() ? null : String.join("; ", errors);
 
                 if (!errors.isEmpty()) {
                     if (hardFail) {
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                        "attempt={} hardFail=true validationErrors=[{}]",
+                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ attempt={} hardFail=true validationErrors=[{}]",
                                 articleId, subJobId, level, attempt, errStr);
                         lastErrors = errStr;
                         if (attempt < MAX_STEP_RETRIES) continue;
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                        "finalStatus=FAILED totalAttempts={}",
-                                articleId, subJobId, level, attempt);
-                        step.markFailed("Quiz validation failed after " + attempt + " attempts", errStr);
-                        stepJobRepository.save(step);
-                        markSubJobFailed(subJob);
+                        markStepFailed(step, subJob, "VALIDATION_ERROR", "Validation failed: " + errStr, errStr);
                         return false;
                     } else {
-                        // Soft warnings — attempt retry for quality improvement (up to max)
-                        log.warn("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                        "attempt={} hardFail=false softWarnings=[{}]",
-                                articleId, subJobId, level, attempt, errStr);
-                        lastErrors = errStr; // feed into retry reason classifier
-                        if (attempt < MAX_STEP_RETRIES) continue; // retry for quality
-                        // Max retries reached even for soft — accept with warnings
-                        log.info("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                        "finalStatus=COMPLETED_WITH_WARNINGS totalAttempts={}",
-                                articleId, subJobId, level, attempt);
-                        saveQuizOnly(articleId, level, result.quizzes());
+                        lastErrors = errStr;
+                        if (attempt < MAX_STEP_RETRIES) continue;
+                        
+                        log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_START", subJobId, attempt);
+                        resultSaver.saveQuiz(articleId, level, result.quizzes());
+                        log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_COMPLETE", subJobId, attempt);
+
                         step.markCompleted("PASS_WITH_WARNINGS");
                         stepJobRepository.save(step);
+                        log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
+                                subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
                         return true;
                     }
                 }
 
-                saveQuizOnly(articleId, level, result.quizzes());
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_START", subJobId, attempt);
+                resultSaver.saveQuiz(articleId, level, result.quizzes());
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_COMPLETE", subJobId, attempt);
+
                 step.markCompleted("PASS");
                 stepJobRepository.save(step);
-                log.info("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                "finalStatus=COMPLETED quizCount={} totalAttempts={}",
-                        articleId, subJobId, level, result.quizzes() == null ? 0 : result.quizzes().size(), attempt);
+                log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
+                        subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
                 return true;
 
             } catch (Exception e) {
-                log.warn("[subJob={} level={}] QUIZ attempt {} FAILED: {}", subJobId, level, attempt, e.getMessage());
+                handleStepException(step, subJob, "QUIZ", attempt, start, e);
                 lastErrors = e.getMessage();
-                if (attempt >= MAX_STEP_RETRIES) {
-                    log.warn("[telemetry] articleId={} subJobId={} level={} stepType=QUIZ " +
-                                    "finalStatus=FAILED totalAttempts={}",
-                            articleId, subJobId, level, attempt);
-                    step.markFailed(e.getMessage(), null);
-                    stepJobRepository.save(step);
-                    markSubJobFailed(subJob);
-                    return false;
-                }
+                if (attempt >= MAX_STEP_RETRIES) return false;
             }
         }
         return false;
+    }
+
+    private int countWords(String text) {
+        if (text == null) return 0;
+        return text.trim().split("\\s+").length;
     }
 
     // ── Retry reason classifiers ──────────────────────────────────────────────
@@ -501,51 +551,8 @@ public class ThreeStepSubJobWorker {
                 });
     }
 
-    @Transactional
-    protected void saveContentOnly(UUID articleId, DifficultyLevel level, String content) {
-        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
-                .orElseGet(() -> {
-                    Article article = articleRepository.findById(articleId)
-                            .orElseThrow(() -> new IllegalArgumentException("Article not found: " + articleId));
-                    var ac = ArticleContent.create(article, level, content);
-                    return contentRepository.save(ac);
-                });
-        // Already exists → update content, clear vocab/quiz
-        vocabularyRepository.deleteAllByArticleContentId(articleContent.getId());
-        quizRepository.deleteAllByArticleContentId(articleContent.getId());
-        vocabularyRepository.flush();
-        quizRepository.flush();
-        articleContent.updateContent(content);
-        contentRepository.save(articleContent);
-    }
+    // Legacy local save helpers removed in favor of GenerationResultSaver
 
-    @Transactional
-    protected void saveVocabOnly(UUID articleId, DifficultyLevel level,
-                                  List<GenerationResult.VocabularyData> vocabs) {
-        if (vocabs == null || vocabs.isEmpty()) return;
-        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
-                .orElseThrow(() -> new IllegalStateException("ArticleContent must exist before saving vocab"));
-        vocabularyRepository.deleteAllByArticleContentId(articleContent.getId());
-        vocabularyRepository.flush();
-        for (var v : vocabs) {
-            String displayWord = vocabLemmatizer.normalizeDisplayWord(v.word());
-            vocabularyRepository.save(Vocabulary.create(articleContent, displayWord, v.definition(), v.exampleSentence()));
-        }
-    }
-
-    @Transactional
-    protected void saveQuizOnly(UUID articleId, DifficultyLevel level,
-                                 List<GenerationResult.QuizData> quizzes) {
-        if (quizzes == null || quizzes.isEmpty()) return;
-        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
-                .orElseThrow(() -> new IllegalStateException("ArticleContent must exist before saving quizzes"));
-        quizRepository.deleteAllByArticleContentId(articleContent.getId());
-        quizRepository.flush();
-        for (var q : quizzes) {
-            quizRepository.save(Quiz.create(articleContent, q.type(), q.question(), q.options(),
-                    q.correctAnswer(), q.explanation()));
-        }
-    }
 
     private List<GenerationResult.VocabularyData> loadVocabFromDb(UUID articleId, DifficultyLevel level) {
         return contentRepository.findByArticleIdAndLevel(articleId, level)
@@ -595,6 +602,63 @@ public class ThreeStepSubJobWorker {
         subJob.updateStatus(JobStatus.FAILED);
         subJobRepository.save(subJob);
         aggregator.aggregate(subJob.getJob().getId());
+    }
+
+    private void handleStepException(ArticleGenerationStepJob step, ArticleGenerationSubJob subJob, 
+                                     String stepTag, int attempt, Instant start, Exception e) {
+        long duration = Instant.now().toEpochMilli() - start.toEpochMilli();
+        log.warn("[diagnostics] subJob={} step={} attempt={} event=EXCEPTION duration={}ms type={} message={}", 
+                subJob.getId(), stepTag, attempt, duration, e.getClass().getSimpleName(), e.getMessage());
+
+        if (attempt >= MAX_STEP_RETRIES) {
+            String failureReason = classifyException(e);
+            String fullError = formatErrorWithStack(e);
+            markStepFailed(step, subJob, failureReason, fullError, null);
+        }
+    }
+
+    private void markStepFailed(ArticleGenerationStepJob step, ArticleGenerationSubJob subJob, 
+                                String reason, String message, String valErrors) {
+        step.markFailed(message, valErrors, reason);
+        stepJobRepository.save(step);
+        markSubJobFailed(subJob);
+        log.info("[diagnostics] subJob={} step={} event=STATUS_UPDATE_FAILED reason={}", 
+                subJob.getId(), step.getStepType(), reason);
+    }
+
+    private String classifyException(Exception e) {
+        String name = e.getClass().getName();
+        String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        
+        if (name.contains("Timeout") || name.contains("SocketTimeout") || msg.contains("timeout") || msg.contains("timed out")) {
+            return "TIMEOUT";
+        }
+        if (name.contains("DataAccess") || name.contains("Transaction") || name.contains("Sql") || msg.contains("update/delete")) {
+            return "TRANSACTION_ERROR";
+        }
+        if (name.contains("Json") || name.contains("Parse")) {
+            return "PARSE_ERROR";
+        }
+        return "UNKNOWN_ERROR";
+    }
+
+    private String formatErrorWithStack(Throwable e) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[").append(e.getClass().getSimpleName()).append("] ").append(e.getMessage()).append("\n");
+        
+        StackTraceElement[] stack = e.getStackTrace();
+        int count = Math.min(stack.length, 10); // Capture first 10 frames
+        for (int i = 0; i < count; i++) {
+            sb.append("  at ").append(stack[i]).append("\n");
+        }
+        if (stack.length > count) {
+            sb.append("  ... (").append(stack.length - count).append(" more)");
+        }
+        
+        if (e.getCause() != null) {
+            sb.append("\nCaused by: ").append(formatErrorWithStack(e.getCause()));
+        }
+        return sb.toString();
     }
 
     // ── Heartbeat ─────────────────────────────────────────────────────────────

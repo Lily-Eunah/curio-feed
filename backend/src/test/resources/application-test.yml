@@ -1,6 +1,7 @@
 spring:
   datasource:
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:tc:postgresql:15:///test_db
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   jpa:
     hibernate:
       ddl-auto: validate
@@ -12,3 +13,5 @@ spring:
         default_batch_fetch_size: 100
   flyway:
     enabled: true
+    clean-disabled: false
+    clean-on-validation-error: true

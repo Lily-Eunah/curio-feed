@@ -76,7 +76,7 @@ class SubJobWorkerTest {
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
-        var result = new GenerationResult("content", List.of(), List.of());
+        var result = new GenerationResult("content", List.of(), List.of(), null);
         when(primaryLlmClient.generate("prompt")).thenReturn("{}");
         when(responseParser.parse(eq("{}"), eq(GenerationResult.class))).thenReturn(result);
         when(validator.validate(result)).thenReturn(ValidationResult.pass(0.85));
@@ -98,8 +98,8 @@ class SubJobWorkerTest {
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
-        var primaryResult = new GenerationResult("short", List.of(), List.of());
-        var fallbackResult = new GenerationResult("long content", List.of(), List.of());
+        var primaryResult = new GenerationResult("short", List.of(), List.of(), null);
+        var fallbackResult = new GenerationResult("long content", List.of(), List.of(), null);
 
         when(primaryLlmClient.generate("prompt")).thenReturn("primary");
         when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);
@@ -125,8 +125,8 @@ class SubJobWorkerTest {
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
         when(promptBuilder.build(any(), any())).thenReturn("prompt");
 
-        var primaryResult = new GenerationResult("content", List.of(), List.of());
-        var fallbackResult = new GenerationResult("good content", List.of(), List.of());
+        var primaryResult = new GenerationResult("content", List.of(), List.of(), null);
+        var fallbackResult = new GenerationResult("good content", List.of(), List.of(), null);
 
         when(primaryLlmClient.generate("prompt")).thenReturn("primary");
         when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);

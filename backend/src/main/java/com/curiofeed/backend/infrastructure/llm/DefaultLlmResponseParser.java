@@ -64,7 +64,7 @@ public class DefaultLlmResponseParser implements LlmResponseParser {
         if (valid.size() != result.quizzes().size()) {
             log.warn("Filtered {} malformed quiz entries (null type/question)", result.quizzes().size() - valid.size());
         }
-        return new GenerationResult(result.content(), result.vocabularies(), valid);
+        return new GenerationResult(result.content(), result.vocabularies(), valid, result.sourceDigest());
     }
 
     /**

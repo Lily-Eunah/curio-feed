@@ -24,6 +24,7 @@ public interface ArticleGenerationStepJobRepository extends JpaRepository<Articl
     void deleteBySubJobId(UUID subJobId);
 
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("""
             UPDATE ArticleGenerationStepJob s
             SET s.status = 'PROCESSING', s.startedAt = :now, s.attemptCount = s.attemptCount + 1
@@ -32,6 +33,7 @@ public interface ArticleGenerationStepJobRepository extends JpaRepository<Articl
     int tryLockStep(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("""
             UPDATE ArticleGenerationStepJob s
             SET s.lastHeartbeatAt = :ts

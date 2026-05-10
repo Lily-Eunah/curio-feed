@@ -1,6 +1,7 @@
 package com.curiofeed.backend.domain.entity;
 
 public enum GenerationStepType {
+    SOURCE_DIGEST,
     CONTENT,
     VOCABULARY,
     QUIZ;
@@ -8,7 +9,8 @@ public enum GenerationStepType {
     /** Steps that must complete before this one can start. */
     public boolean dependsOn(GenerationStepType other) {
         return switch (this) {
-            case CONTENT -> false;
+            case SOURCE_DIGEST -> false;
+            case CONTENT -> other == SOURCE_DIGEST; // Optional dependency handled in worker
             case VOCABULARY -> other == CONTENT;
             case QUIZ -> other == CONTENT || other == VOCABULARY;
         };

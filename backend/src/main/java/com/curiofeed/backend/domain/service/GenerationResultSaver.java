@@ -6,6 +6,7 @@ import com.curiofeed.backend.domain.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +29,62 @@ public class GenerationResultSaver {
         this.quizRepository = quizRepository;
     }
 
+    @Transactional
+    public void saveContent(UUID articleId, DifficultyLevel level, String content) {
+        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
+                .orElseGet(() -> {
+                    System.out.println("DEBUG: GenerationResultSaver: Article not found in contentRepository. Fetching from articleRepository with ID: " + articleId);
+                    Article article = articleRepository.findById(articleId)
+                            .orElseThrow(() -> {
+                                System.err.println("DEBUG: GenerationResultSaver: FATAL: Article not found in articleRepository: " + articleId);
+                                return new IllegalArgumentException("Article not found: " + articleId);
+                            });
+                    var ac = ArticleContent.create(article, level, content);
+                    return contentRepository.save(ac);
+                });
+        
+        // Clear existing related data when content is updated
+        vocabularyRepository.deleteAllByArticleContentId(articleContent.getId());
+        quizRepository.deleteAllByArticleContentId(articleContent.getId());
+        vocabularyRepository.flush();
+        quizRepository.flush();
+        
+        articleContent.updateContent(content);
+        contentRepository.save(articleContent);
+    }
+
+    @Transactional
+    public void saveVocab(UUID articleId, DifficultyLevel level, 
+                          List<GenerationResult.VocabularyData> vocabs, 
+                          com.curiofeed.backend.infrastructure.llm.validation.VocabLemmatizer lemmatizer) {
+        if (vocabs == null || vocabs.isEmpty()) return;
+        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
+                .orElseThrow(() -> new IllegalStateException("ArticleContent must exist before saving vocab"));
+        
+        vocabularyRepository.deleteAllByArticleContentId(articleContent.getId());
+        vocabularyRepository.flush();
+        
+        for (var v : vocabs) {
+            String displayWord = lemmatizer.normalizeDisplayWord(v.word());
+            vocabularyRepository.save(Vocabulary.create(articleContent, displayWord, v.definition(), v.exampleSentence()));
+        }
+    }
+
+    @Transactional
+    public void saveQuiz(UUID articleId, DifficultyLevel level, List<GenerationResult.QuizData> quizzes) {
+        if (quizzes == null || quizzes.isEmpty()) return;
+        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
+                .orElseThrow(() -> new IllegalStateException("ArticleContent must exist before saving quizzes"));
+        
+        quizRepository.deleteAllByArticleContentId(articleContent.getId());
+        quizRepository.flush();
+        
+        for (var q : quizzes) {
+            quizRepository.save(Quiz.create(articleContent, q.type(), q.question(), q.options(),
+                    q.correctAnswer(), q.explanation()));
+        }
+    }
+
     /**
      * 하나의 난이도(level)에 대한 content + vocabularies + quizzes를 단일 트랜잭션으로 저장.
      * 예외 발생 시 전체 롤백.
@@ -39,30 +96,17 @@ public class GenerationResultSaver {
             return SaveStatus.NO_CONTENT;
         }
 
-        // 2. ArticleContent 저장 (safe update: 기존 존재하면 delete children → update content)
-        ArticleContent articleContent;
-        Optional<ArticleContent> existing = contentRepository.findByArticleIdAndLevel(articleId, level);
-        if (existing.isPresent()) {
-            articleContent = existing.get();
-            // 기존 연관 데이터 삭제 (delete-then-insert 대신 children만 삭제)
-            vocabularyRepository.deleteAllByArticleContentId(articleContent.getId());
-            quizRepository.deleteAllByArticleContentId(articleContent.getId());
-            vocabularyRepository.flush();
-            quizRepository.flush();
-            articleContent.updateContent(result.content());
-        } else {
-            Article article = articleRepository.findById(articleId)
-                    .orElseThrow(() -> new IllegalArgumentException("Article not found: " + articleId));
-            articleContent = ArticleContent.create(article, level, result.content());
-            contentRepository.save(articleContent);
-        }
+        // 2. ArticleContent 저장
+        saveContent(articleId, level, result.content());
+        ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level).get();
 
         // 3. vocab 없으면 CONTENT_ONLY
         if (!result.hasVocabularies()) {
             return SaveStatus.CONTENT_ONLY;
         }
 
-        // 4. Vocabulary 저장
+        // 4. Vocabulary 저장 (Manual saving here because we don't have lemmatizer in this method usually, 
+        // but for full save we can assume it's already lemmatized or use a simple save)
         for (var vd : result.vocabularies()) {
             vocabularyRepository.save(
                     Vocabulary.create(articleContent, vd.word(), vd.definition(), vd.exampleSentence()));
@@ -82,3 +126,4 @@ public class GenerationResultSaver {
         return SaveStatus.FULL_SUCCESS;
     }
 }
+

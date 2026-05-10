@@ -54,6 +54,10 @@ public class ArticleGenerationStepJob extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
+    /** TIMEOUT, TRANSACTION, VALIDATION, PARSE, etc. */
+    @Column(length = 50)
+    private String failureReason;
+
     public static ArticleGenerationStepJob pending(ArticleGenerationSubJob subJob, GenerationStepType stepType) {
         var step = new ArticleGenerationStepJob();
         step.subJob = subJob;
@@ -78,11 +82,19 @@ public class ArticleGenerationStepJob extends BaseEntity {
         this.validationStatus = validationStatus;
     }
 
-    public void markFailed(String errorMessage, String validationErrors) {
+    public void markSkipped(String reason) {
+        this.status = JobStatus.SKIPPED;
+        this.completedAt = Instant.now();
+        this.validationStatus = "SKIPPED";
+        this.errorMessage = reason;
+    }
+
+    public void markFailed(String errorMessage, String validationErrors, String failureReason) {
         this.status = JobStatus.FAILED;
         this.completedAt = Instant.now();
         this.errorMessage = errorMessage;
         this.validationErrors = validationErrors;
+        this.failureReason = failureReason;
     }
 
     public void resetToPending() {
@@ -93,6 +105,7 @@ public class ArticleGenerationStepJob extends BaseEntity {
         this.errorMessage = null;
         this.validationStatus = null;
         this.validationErrors = null;
+        this.failureReason = null;
     }
 
     public void updateHeartbeat(Instant ts) {

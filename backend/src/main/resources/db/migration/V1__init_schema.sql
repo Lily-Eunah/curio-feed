@@ -99,7 +99,7 @@ CREATE TABLE article_generation_sub_jobs (
 CREATE TABLE article_generation_step_jobs (
     id                UUID PRIMARY KEY,
     sub_job_id        UUID NOT NULL REFERENCES article_generation_sub_jobs(id),
-    step_type         VARCHAR(20)  NOT NULL,  -- CONTENT | VOCABULARY | QUIZ
+    step_type         VARCHAR(20)  NOT NULL,  -- SOURCE_DIGEST | CONTENT | VOCABULARY | QUIZ
     status            VARCHAR(20)  NOT NULL,  -- PENDING | PROCESSING | COMPLETED | FAILED
     attempt_count     INT          NOT NULL DEFAULT 0,
     started_at        TIMESTAMP WITH TIME ZONE,

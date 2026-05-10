@@ -115,15 +115,15 @@ class AdminArticleControllerTest {
         assertThat(subJobs).hasSize(3);
         assertThat(subJobs).allMatch(s -> s.getStatus() == JobStatus.PENDING);
 
-        // Each sub-job should have exactly 3 step jobs pre-created (CONTENT, VOCABULARY, QUIZ)
+        // Each sub-job should have exactly 4 step jobs pre-created (SOURCE_DIGEST, CONTENT, VOCABULARY, QUIZ)
         List<ArticleGenerationStepJob> stepJobs = stepJobRepository.findAll();
-        assertThat(stepJobs).hasSize(9); // 3 sub-jobs × 3 steps
+        assertThat(stepJobs).hasSize(12); // 3 sub-jobs × 4 steps
         assertThat(stepJobs).allMatch(s -> s.getStatus() == JobStatus.PENDING);
         assertThat(stepJobs.stream().map(ArticleGenerationStepJob::getStepType).toList())
                 .containsExactlyInAnyOrder(
-                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
-                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
-                        GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ);
+                        GenerationStepType.SOURCE_DIGEST, GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
+                        GenerationStepType.SOURCE_DIGEST, GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ,
+                        GenerationStepType.SOURCE_DIGEST, GenerationStepType.CONTENT, GenerationStepType.VOCABULARY, GenerationStepType.QUIZ);
     }
 
     @Test

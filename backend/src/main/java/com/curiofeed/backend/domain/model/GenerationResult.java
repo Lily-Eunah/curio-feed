@@ -7,7 +7,8 @@ import java.util.List;
 public record GenerationResult(
         String content,
         List<VocabularyData> vocabularies,
-        List<QuizData> quizzes
+        List<QuizData> quizzes,
+        SourceDigestData sourceDigest
 ) {
 
     public boolean hasContent() {
@@ -21,6 +22,17 @@ public record GenerationResult(
     public boolean hasQuizzes() {
         return quizzes != null && !quizzes.isEmpty();
     }
+
+    public boolean hasSourceDigest() {
+        return sourceDigest != null && sourceDigest.centralStory() != null;
+    }
+
+    public record SourceDigestData(
+            String centralStory,
+            List<String> coreFacts,
+            List<String> supportingDetails,
+            List<String> omittedDetails
+    ) {}
 
     public record VocabularyData(
             String word,

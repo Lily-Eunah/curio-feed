@@ -9,7 +9,8 @@ export type StatusType =
   | 'PUBLISHED'
   | 'HIDDEN'
   | 'READY'
-  | 'STALE';
+  | 'STALE'
+  | 'SKIPPED';
 
 interface StatusConfig {
   label: string;
@@ -28,6 +29,7 @@ const STATUS_CONFIG: Record<StatusType, StatusConfig> = {
   HIDDEN: { label: 'Hidden', className: 'bg-gray-100 text-gray-700' },
   READY: { label: 'Ready', className: 'bg-purple-100 text-purple-700' },
   STALE: { label: 'Stale', className: 'bg-amber-100 text-amber-700' },
+  SKIPPED: { label: 'Skipped', className: 'bg-gray-100 text-gray-400' },
 };
 
 interface StatusBadgeProps {
