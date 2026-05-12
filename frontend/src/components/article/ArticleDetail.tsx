@@ -19,6 +19,7 @@ interface Props {
   savedIds: string[];
   quizProgress: Record<string, ArticleQuizProgress>;
   continueReading: ContinueReadingState | null;
+  isLoading?: boolean;
   onBack: () => void;
   onSave: (id: string) => void;
   onQuizAnswer: (articleId: string, qKey: 'q1' | 'q2' | 'q3', answer: MCQResult | ShortAnswerResult) => void;
@@ -29,7 +30,7 @@ interface Props {
 }
 
 export default function ArticleDetail({
-  article, userLevel, savedIds, quizProgress, continueReading,
+  article, userLevel, savedIds, quizProgress, continueReading, isLoading,
   onBack, onSave, onQuizAnswer, onScrollProgress, onLevelChange, nextArticle, onNextArticle,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -38,9 +39,15 @@ export default function ArticleDetail({
   const [currentLevel, setCurrentLevel] = useState<DifficultyLevel>(userLevel);
   const [levelToast, setLevelToast] = useState<string | null>(null);
 
+  // Sync with prop (Problem 3)
+  useEffect(() => {
+    setCurrentLevel(userLevel);
+  }, [userLevel]);
+
   const articleId = article.id;
   const isSaved = savedIds.includes(articleId);
-  const progress = quizProgress[articleId] ?? {};
+  const levelKey = `${articleId}:${currentLevel}`;
+  const progress = quizProgress[levelKey] ?? {};
   const answeredCount = Object.keys(progress).length;
 
   // Restore scroll from continue reading (UI_POLICY §3)
@@ -135,75 +142,103 @@ export default function ArticleDetail({
           {/* Level switcher (not sticky, UI_POLICY §4.2) */}
           <InlineLevelSwitcher currentLevel={currentLevel} onSwitch={handleLevelSwitch} />
 
-          {/* Meta line */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: catColor, display: 'inline-block' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: catColor, letterSpacing: '0.06em' }}>
-              {article.category.toUpperCase()}
-            </span>
-            <span style={{ width: 2, height: 2, borderRadius: '50%', background: COLORS.textTer, display: 'inline-block' }} />
-            <span style={{ fontSize: 11, color: COLORS.textTer }}>{article.date}</span>
-            <span style={{ width: 2, height: 2, borderRadius: '50%', background: COLORS.textTer, display: 'inline-block' }} />
-            <span style={{ fontSize: 11, color: COLORS.textTer }}>{article.readTime}</span>
+          {/* Loading Overlay (Problem 3) - now covers title/meta/body/quiz */}
+          <div style={{ position: 'relative', minHeight: 400 }}>
+            {isLoading && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: -8, // slight offset to cover padding
+                  background: 'rgba(250,250,248,0.8)',
+                  backdropFilter: 'blur(5px)',
+                  zIndex: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 16,
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                  <div className="spinner" style={{ width: 34, height: 34, border: `3.5px solid ${COLORS.accentLight}`, borderTopColor: COLORS.accent, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ fontSize: 13, color: COLORS.accent, fontWeight: 600, letterSpacing: '0.02em' }}>
+                    Switching to {LEVEL_CONFIG[currentLevel]?.label ?? currentLevel}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Meta line */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: catColor, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: catColor, letterSpacing: '0.06em' }}>
+                {article.category.toUpperCase()}
+              </span>
+              <span style={{ width: 2, height: 2, borderRadius: '50%', background: COLORS.textTer, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, color: COLORS.textTer }}>{article.date}</span>
+              <span style={{ width: 2, height: 2, borderRadius: '50%', background: COLORS.textTer, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, color: COLORS.textTer }}>{article.readTime}</span>
+            </div>
+
+            {/* Title */}
+            <h1
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                color: COLORS.text,
+                lineHeight: 1.25,
+                letterSpacing: '-0.03em',
+                margin: '0 0 20px',
+              }}
+            >
+              {article.title}
+            </h1>
+
+            {/* Article body (scroll-tracked) */}
+            <ArticleBody
+              key={`${levelKey}:body`}
+              body={article.body}
+              vocabulary={article.vocabulary}
+              onVocabTap={setVocabSheet}
+              bodyRef={bodyRef}
+            />
+
+            {/* Vocab tap hint */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: COLORS.accentLight,
+                borderRadius: 10,
+                padding: '10px 14px',
+                marginBottom: 32,
+                marginTop: 4,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.accent} strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 500 }}>
+                Tap underlined words to see definitions
+              </span>
+            </div>
+
+            <Divider />
+            <VocabReview vocabulary={article.vocabulary} />
+            <Divider />
+            <SaveButton isSaved={isSaved} onToggle={() => onSave(articleId)} />
+            <Divider />
+
+            <QuizSection
+              key={`${levelKey}:quiz`}
+              articleId={articleId}
+              quiz={article.quiz}
+              progress={progress}
+              onAnswer={onQuizAnswer}
+            />
           </div>
-
-          {/* Title */}
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: COLORS.text,
-              lineHeight: 1.25,
-              letterSpacing: '-0.03em',
-              margin: '0 0 20px',
-            }}
-          >
-            {article.title}
-          </h1>
-
-          {/* Article body (scroll-tracked) */}
-          <ArticleBody
-            body={article.body}
-            vocabulary={article.vocabulary}
-            onVocabTap={setVocabSheet}
-            bodyRef={bodyRef}
-          />
-
-          {/* Vocab tap hint */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: COLORS.accentLight,
-              borderRadius: 10,
-              padding: '10px 14px',
-              marginBottom: 32,
-              marginTop: 4,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.accent} strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span style={{ fontSize: 12, color: COLORS.accent, fontWeight: 500 }}>
-              Tap underlined words to see definitions
-            </span>
-          </div>
-
-          <Divider />
-          <VocabReview vocabulary={article.vocabulary} />
-          <Divider />
-          <SaveButton isSaved={isSaved} onToggle={() => onSave(articleId)} />
-          <Divider />
-
-          <QuizSection
-            articleId={articleId}
-            quiz={article.quiz}
-            progress={progress}
-            onAnswer={onQuizAnswer}
-          />
 
           {/* Next article: shown after ≥1 quiz answered (UI_POLICY §10) */}
           {nextArticle && answeredCount >= 1 && (

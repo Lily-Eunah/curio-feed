@@ -56,6 +56,7 @@ export default function App() {
   const [currentArticleId, setCurrentArticleId] = useState<string | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [toast, setToast] = useState({ message: '', visible: false });
@@ -190,8 +191,9 @@ export default function App() {
     answer: MCQResult | ShortAnswerResult,
   ) => {
     setAppState(prev => {
-      const prevProgress = prev.quizProgress[articleId] ?? {};
-      const quizProgress = { ...prev.quizProgress, [articleId]: { ...prevProgress, [qKey]: answer } };
+      const levelKey = `${articleId}:${prev.userLevel}`;
+      const prevProgress = prev.quizProgress[levelKey] ?? {};
+      const quizProgress = { ...prev.quizProgress, [levelKey]: { ...prevProgress, [qKey]: answer } };
       const readIds = prev.readIds.includes(articleId) ? prev.readIds : [...prev.readIds, articleId];
       // Remove from continue reading once read (UI_POLICY §3.2)
       const continueReading = prev.continueReading?.articleId === articleId ? null : prev.continueReading;
@@ -208,9 +210,21 @@ export default function App() {
     });
   }, [setAppState]);
 
-  const handleLevelChangeFromArticle = useCallback((level: DifficultyLevel) => {
+  const handleLevelChangeFromArticle = useCallback(async (level: DifficultyLevel) => {
     setAppState({ userLevel: level });
-  }, [setAppState]);
+    if (currentArticleId) {
+      setLoadingDetail(true);
+      try {
+        const detail = await fetchArticleDetail(currentArticleId, level);
+        setArticles(prev => prev.map(a => a.id === currentArticleId ? mapFullArticle(detail, a) : a));
+      } catch (err) {
+        console.error('Failed to switch level:', err);
+        showToast('Failed to load level details');
+      } finally {
+        setLoadingDetail(false);
+      }
+    }
+  }, [currentArticleId, setAppState, showToast]);
 
   const handleNextArticle = useCallback((id: string) => {
     setCurrentArticleId(id);
@@ -272,6 +286,7 @@ export default function App() {
             savedIds={appState.savedIds}
             quizProgress={appState.quizProgress}
             continueReading={appState.continueReading}
+            isLoading={loadingDetail}
             onBack={handleBack}
             onSave={handleArticleSave}
             onQuizAnswer={handleQuizAnswer}

@@ -5,6 +5,7 @@ import com.curiofeed.backend.api.dto.CursorPageResponse;
 import com.curiofeed.backend.domain.entity.ArticleStatus;
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
 import com.curiofeed.backend.domain.repository.ArticleFeedRepository;
+import com.curiofeed.backend.utils.TextSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -67,7 +68,7 @@ public class ArticleFeedService {
                 .map(a -> new ArticleFeedResponse(
                         a.getId().toString(),
                         a.getTitle(),
-                        a.getOriginalContent(),
+                        TextSanitizer.sanitizeForPreview(a.getOriginalContent(), 200),
                         a.getCategory().getDisplayName(),
                         a.getSourceName(),
                         a.getPublishedAt(),
@@ -79,11 +80,11 @@ public class ArticleFeedService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ArticleFeedResponse withReadingTime(ArticleFeedResponse r, DifficultyLevel level) {
-        if (r.getEstimatedReadingTime() != 0) return r; // already set
+        String sanitized = TextSanitizer.sanitizeForPreview(r.getExcerpt(), 200);
         return ArticleFeedResponse.builder()
                 .id(r.getId())
                 .title(r.getTitle())
-                .excerpt(r.getExcerpt())
+                .excerpt(sanitized)
                 .categoryName(r.getCategoryName())
                 .sourceName(r.getSourceName())
                 .publishedAt(r.getPublishedAt())

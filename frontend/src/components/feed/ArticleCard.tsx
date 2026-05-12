@@ -105,7 +105,18 @@ export default memo(function ArticleCard({ article, isVisited, isSaved, onTap, o
         >
           {article.title}
         </h3>
-        <p style={{ fontSize: 13, color: COLORS.textSec, lineHeight: 1.5, margin: '0 0 10px' }}>
+        <p
+          style={{
+            fontSize: 13,
+            color: COLORS.textSec,
+            lineHeight: 1.5,
+            margin: '0 0 10px',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
           {article.excerpt}
         </p>
         <span style={{ fontSize: 11, color: COLORS.textTer }}>
