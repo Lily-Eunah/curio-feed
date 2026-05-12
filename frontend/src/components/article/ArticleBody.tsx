@@ -32,7 +32,10 @@ function parseBody(
   // Combine with the {{}} pattern
   const combinedPattern = new RegExp(`({{[^}]+}})|(${patterns.join('|')})`, 'gi');
 
-  return text.split('\n\n').map((para, pIdx) => {
+  // Normalize literal \n (backslash + n stored in legacy seed SQL) to actual newlines
+  const normalized = text.replace(/\\n/g, '\n');
+
+  return normalized.split('\n\n').map((para, pIdx) => {
     const parts = para.split(combinedPattern);
     const children = parts.filter(p => p !== undefined && p !== '').map((part, i) => {
       const markerMatch = part.match(/^{{(.+)}}$/);

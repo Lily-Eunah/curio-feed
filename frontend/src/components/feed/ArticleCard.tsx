@@ -25,6 +25,16 @@ function CategoryDot({ category }: { category: string }) {
   );
 }
 
+// Defensive sanitizer for frontend (Problem 1)
+function sanitizePreview(text: string) {
+  if (!text) return '';
+  return text
+    .replace(/\{\{\s*([^}]+?)\s*\}\}/g, '$1') // {{ word }} -> word
+    .replace(/\\n|\\r|\r?\n/g, ' ')           // newlines -> space
+    .replace(/\s+/g, ' ')                     // collapse spaces
+    .trim();
+}
+
 export default memo(function ArticleCard({ article, isVisited, isSaved, onTap, onSave }: Props) {
   const [pressed, setPressed] = useState(false);
   const catColor = CAT_COLORS[article.category]?.dot ?? COLORS.textSec;
@@ -117,7 +127,7 @@ export default memo(function ArticleCard({ article, isVisited, isSaved, onTap, o
             overflow: 'hidden',
           }}
         >
-          {article.excerpt}
+          {sanitizePreview(article.excerpt)}
         </p>
         <span style={{ fontSize: 11, color: COLORS.textTer }}>
           {article.readTime}

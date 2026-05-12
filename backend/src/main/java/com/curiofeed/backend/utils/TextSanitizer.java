@@ -4,14 +4,14 @@ import java.util.regex.Pattern;
 
 public class TextSanitizer {
 
-    private static final Pattern VOCAB_MARKER = Pattern.compile("\\{\\{([^}]+)\\}\\}");
-    private static final Pattern NEWLINE_OR_ESCAPE = Pattern.compile("\\\\n|\\n");
+    private static final Pattern VOCAB_MARKER = Pattern.compile("\\{\\{\\s*([^}]+?)\\s*\\}\\}");
+    private static final Pattern NEWLINE_OR_ESCAPE = Pattern.compile("\\\\n|\\\\r|\\r?\\n");
     private static final Pattern MULTI_SPACE = Pattern.compile("\\s+");
 
     /**
      * Sanitizes and truncates text for previews.
-     * 1. Removes {{word}} markers -> word
-     * 2. Replaces newlines/escaped newlines with space
+     * 1. Removes {{word}} markers -> word (handles extra spaces inside braces)
+     * 2. Replaces newlines/escaped newlines/carriages with space
      * 3. Collapses multiple spaces
      * 4. Trims
      * 5. Truncates to maxLength with "..."
@@ -21,10 +21,10 @@ public class TextSanitizer {
             return "";
         }
 
-        // 1. {{word}} -> word
+        // 1. {{ word }} -> word
         String result = VOCAB_MARKER.matcher(text).replaceAll("$1");
 
-        // 2. \n or \\n -> space
+        // 2. \n, \\n, \r\n -> space
         result = NEWLINE_OR_ESCAPE.matcher(result).replaceAll(" ");
 
         // 3. Multi-space collapse
