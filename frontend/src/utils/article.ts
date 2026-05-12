@@ -2,8 +2,9 @@
  * Mapping utilities — convert backend DTOs to frontend display models.
  */
 
+import { fetchArticleDetail, ApiError } from '../api/client';
 import type { QuizDto, ArticleDetailDto, FeedArticleDto } from '../api/types';
-import type { Article } from '../types';
+import type { Article, DifficultyLevel } from '../types';
 
 // ── Mapped types ────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,39 @@ export function mapFeedArticle(dto: FeedArticleDto): Article {
   };
 }
 
+/**
+ * Fetches article detail at `level`, falling back to MEDIUM on 404.
+ * Never retries when the requested level is already MEDIUM.
+ */
+export async function fetchDetailWithFallback(
+  id: string,
+  level: DifficultyLevel,
+): Promise<ArticleDetailDto> {
+  try {
+    return await fetchArticleDetail(id, level);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404 && level !== 'MEDIUM') {
+      return fetchArticleDetail(id, 'MEDIUM');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Picks the best available level for an article.
+ * Priority: preferred → MEDIUM → first available.
+ * If availableLevels is unknown (undefined/empty), returns preferred.
+ */
+export function resolveAvailableLevel(
+  preferred: DifficultyLevel,
+  availableLevels?: DifficultyLevel[],
+): DifficultyLevel {
+  if (!availableLevels || availableLevels.length === 0) return preferred;
+  if (availableLevels.includes(preferred)) return preferred;
+  if (availableLevels.includes('MEDIUM')) return 'MEDIUM';
+  return availableLevels[0];
+}
+
 export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Article {
   const wordCount = dto.content.content.split(/\s+/).filter(Boolean).length;
   const mcqs = dto.content.quizzes.filter((q) => q.type === 'MULTIPLE_CHOICE');
@@ -176,5 +210,6 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     })),
     body: dto.content.content,
     quiz: { q1, q2, q3 },
+    availableLevels: dto.availableLevels,
   };
 }

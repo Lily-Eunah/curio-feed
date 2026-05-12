@@ -35,6 +35,7 @@ export interface Article {
   vocabulary: VocabEntry[];
   body: string;
   quiz: ArticleQuiz;
+  availableLevels?: DifficultyLevel[];
 }
 
 export interface MCQResult {

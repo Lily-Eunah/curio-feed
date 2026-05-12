@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { COLORS } from './theme';
-import { fetchFeedArticles, fetchArticleDetail } from './api/client';
-import { mapFeedArticle, mapFullArticle } from './utils/article';
+import { fetchFeedArticles } from './api/client';
+import { mapFeedArticle, mapFullArticle, resolveAvailableLevel, fetchDetailWithFallback } from './utils/article';
 import type { Article } from './types';
 import type { AppState, DifficultyLevel, MCQResult, ShortAnswerResult, ContinueReadingState } from './types';
 import Toast from './components/ui/Toast';
@@ -56,9 +56,11 @@ export default function App() {
   const [currentArticleId, setCurrentArticleId] = useState<string | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [toast, setToast] = useState({ message: '', visible: false });
+  const loadingNextRef = useRef(false);
 
   const setAppState = useCallback((updater: Partial<AppState> | ((prev: AppState) => AppState)) => {
     setAppStateRaw(prev => {
@@ -77,11 +79,9 @@ export default function App() {
 
   const getNextArticle = useCallback((articleId: string) => {
     const idx = articles.findIndex(a => a.id === articleId);
-    const rest = articles.slice(idx + 1).filter(a =>
-      appState.selectedCategory === 'All' || a.category === articles[idx]?.category,
-    );
-    return rest[0] ?? null;
-  }, [appState.selectedCategory, articles]);
+    if (idx === -1) return null;
+    return articles[idx + 1] ?? null;
+  }, [articles]);
 
   // ── API Fetching ─────────────────────────────────────────────────────────────
 
@@ -105,8 +105,10 @@ export default function App() {
   }, [appState.onboarded, appState.userLevel, appState.selectedCategory]);
 
   useEffect(() => {
-    loadFeed();
-  }, [loadFeed]);
+    if (screen === 'feed') {
+      loadFeed();
+    }
+  }, [loadFeed, screen]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -126,8 +128,9 @@ export default function App() {
     // Fetch full detail if not already loaded (placeholder check)
     const existing = articles.find(a => a.id === id);
     if (existing && existing.body === '') {
+      const level = resolveAvailableLevel(appState.userLevel, existing.availableLevels);
       try {
-        const detail = await fetchArticleDetail(id, appState.userLevel);
+        const detail = await fetchDetailWithFallback(id, level);
         setArticles(prev => prev.map(a => a.id === id ? mapFullArticle(detail, a) : a));
       } catch (err) {
         console.error('Failed to fetch article detail:', err);
@@ -190,8 +193,9 @@ export default function App() {
     answer: MCQResult | ShortAnswerResult,
   ) => {
     setAppState(prev => {
-      const prevProgress = prev.quizProgress[articleId] ?? {};
-      const quizProgress = { ...prev.quizProgress, [articleId]: { ...prevProgress, [qKey]: answer } };
+      const levelKey = `${articleId}:${prev.userLevel}`;
+      const prevProgress = prev.quizProgress[levelKey] ?? {};
+      const quizProgress = { ...prev.quizProgress, [levelKey]: { ...prevProgress, [qKey]: answer } };
       const readIds = prev.readIds.includes(articleId) ? prev.readIds : [...prev.readIds, articleId];
       // Remove from continue reading once read (UI_POLICY §3.2)
       const continueReading = prev.continueReading?.articleId === articleId ? null : prev.continueReading;
@@ -208,17 +212,64 @@ export default function App() {
     });
   }, [setAppState]);
 
-  const handleLevelChangeFromArticle = useCallback((level: DifficultyLevel) => {
-    setAppState({ userLevel: level });
-  }, [setAppState]);
+  const handleLevelChangeFromArticle = useCallback(async (level: DifficultyLevel) => {
+    if (!currentArticleId || loadingDetail) return;
 
-  const handleNextArticle = useCallback((id: string) => {
-    setCurrentArticleId(id);
-    setAppState(prev => ({
-      ...prev,
-      visitedIds: prev.visitedIds.includes(id) ? prev.visitedIds : [...prev.visitedIds, id],
-    }));
-  }, [setAppState]);
+    setLoadingDetail(true);
+    try {
+      const detail = await fetchDetailWithFallback(currentArticleId, level);
+      // Use the level that was actually served (may differ from requested when MEDIUM fallback fires)
+      const fetchedLevel = detail.content.level;
+      setAppState({ userLevel: fetchedLevel });
+      setArticles(prev => prev.map(a => a.id === currentArticleId ? mapFullArticle(detail, a) : a));
+    } catch (err) {
+      console.error('Failed to switch level:', err);
+      showToast('Failed to load level details');
+      // Keep appState.userLevel as the OLD level; ArticleDetail syncs back via prop.
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [currentArticleId, loadingDetail, setAppState, showToast]);
+
+  const handleNextArticle = useCallback(async (nextId: string) => {
+    if (loadingNextRef.current || loadingDetail) return;
+    loadingNextRef.current = true;
+
+    const nextFeedArticle = articles.find(a => a.id === nextId);
+
+    // If detail is already cached, navigate immediately with resolved level
+    if (nextFeedArticle && nextFeedArticle.body !== '') {
+      const resolvedLevel = resolveAvailableLevel(appState.userLevel, nextFeedArticle.availableLevels);
+      setCurrentArticleId(nextId);
+      setAppState(prev => ({
+        ...prev,
+        userLevel: resolvedLevel,
+        visitedIds: prev.visitedIds.includes(nextId) ? prev.visitedIds : [...prev.visitedIds, nextId],
+      }));
+      loadingNextRef.current = false;
+      return;
+    }
+
+    // Fetch detail before navigating so the current article stays visible on failure
+    const level = resolveAvailableLevel(appState.userLevel, nextFeedArticle?.availableLevels);
+    try {
+      const detail = await fetchDetailWithFallback(nextId, level);
+      const fetchedLevel = detail.content.level;
+      setArticles(prev => prev.map(a => a.id === nextId ? mapFullArticle(detail, a) : a));
+      setCurrentArticleId(nextId);
+      setAppState(prev => ({
+        ...prev,
+        userLevel: fetchedLevel,
+        visitedIds: prev.visitedIds.includes(nextId) ? prev.visitedIds : [...prev.visitedIds, nextId],
+      }));
+    } catch (err) {
+      console.error('Failed to load next article:', err);
+      showToast('Failed to load next article');
+      // currentArticleId is NOT changed — current article remains visible
+    } finally {
+      loadingNextRef.current = false;
+    }
+  }, [articles, appState.userLevel, loadingDetail, setAppState, showToast]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -272,6 +323,7 @@ export default function App() {
             savedIds={appState.savedIds}
             quizProgress={appState.quizProgress}
             continueReading={appState.continueReading}
+            isLoading={loadingDetail}
             onBack={handleBack}
             onSave={handleArticleSave}
             onQuizAnswer={handleQuizAnswer}

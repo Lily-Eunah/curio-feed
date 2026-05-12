@@ -26,24 +26,24 @@ public class ArticleController {
 
     @GetMapping
     public ResponseEntity<CursorPageResponse<ArticleFeedResponse>> getArticleFeed(
-            @RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false, defaultValue = "MEDIUM") DifficultyLevel level
+            @RequestParam(name = "cursor", required = false) String cursor,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "level", required = false, defaultValue = "MEDIUM") DifficultyLevel level
     ) {
         return ResponseEntity.ok(feedService.getFeed(cursor, size, level));
     }
 
     @GetMapping("/bulk")
     public ResponseEntity<java.util.List<ArticleFeedResponse>> getArticlesBulk(
-            @RequestParam java.util.List<UUID> ids
+            @RequestParam("ids") java.util.List<UUID> ids
     ) {
         return ResponseEntity.ok(feedService.getArticlesByIds(ids));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ArticleDetailResponse> getArticleDetail(
-            @PathVariable UUID id,
-            @RequestParam(required = false, defaultValue = "EASY") DifficultyLevel level
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "level", required = false, defaultValue = "EASY") DifficultyLevel level
     ) {
         return ResponseEntity.ok(articleDetailService.getArticleDetail(id, level));
     }

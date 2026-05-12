@@ -32,7 +32,7 @@ public class AdminCategoryController {
     private final ArticleRepository articleRepository;
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> listCategories(@RequestParam(defaultValue = "false") boolean all) {
+    public ResponseEntity<List<CategoryResponse>> listCategories(@RequestParam(name = "all", defaultValue = "false") boolean all) {
         List<Category> categories = all
                 ? categoryRepository.findAllByOrderBySortOrderAsc()
                 : categoryRepository.findByActiveTrueOrderBySortOrderAsc();
@@ -65,7 +65,7 @@ public class AdminCategoryController {
 
     @PatchMapping("/{id}")
     @Transactional
-    public ResponseEntity<?> updateCategory(@PathVariable UUID id, @RequestBody CategorySaveRequest request) {
+    public ResponseEntity<?> updateCategory(@PathVariable("id") UUID id, @RequestBody CategorySaveRequest request) {
         return categoryRepository.findById(id).map(category -> {
             category.update(
                     request.name(),
@@ -79,7 +79,7 @@ public class AdminCategoryController {
 
     @DeleteMapping("/{id}")
     @Transactional
-    public ResponseEntity<?> deleteCategory(@PathVariable UUID id) {
+    public ResponseEntity<?> deleteCategory(@PathVariable("id") UUID id) {
         return categoryRepository.findById(id).map(category -> {
             if (articleRepository.existsByCategoryId(id)) {
                 // If articles exist, do soft delete
