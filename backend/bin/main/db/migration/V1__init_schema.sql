@@ -4,11 +4,10 @@ CREATE TABLE categories (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     display_name VARCHAR(100) NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    sort_order INT NOT NULL,
-    CONSTRAINT uk_categories_name UNIQUE (name)
+    active BOOLEAN NOT NULL,
+    sort_order INT NOT NULL
 );
 
 CREATE TABLE articles (
@@ -20,15 +19,11 @@ CREATE TABLE articles (
     source_url TEXT NOT NULL,
     original_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
     title VARCHAR(500) NOT NULL,
-    slug VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
     category_id UUID NOT NULL REFERENCES categories (id),
     published_at TIMESTAMP WITH TIME ZONE NOT NULL,
     status VARCHAR(255) NOT NULL,
-    original_content TEXT,
-    version BIGINT NOT NULL DEFAULT 0,
-    view_count BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT uk_articles_slug UNIQUE (slug),
-    CONSTRAINT uk_articles_source_url UNIQUE (source_url)
+    thumbnail_url VARCHAR(255) NOT NULL
 );
 
 -- Composite Indexes (Optimized for Pagination & Sorting)
@@ -74,44 +69,3 @@ CREATE TABLE quizzes (
 );
 
 CREATE INDEX idx_quiz_article_content ON quizzes (article_content_id);
-
--- Generation Pipeline Tables
-CREATE TABLE article_generation_jobs (
-    id UUID PRIMARY KEY,
-    article_id UUID NOT NULL REFERENCES articles(id),
-    status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
-);
-
-CREATE TABLE article_generation_sub_jobs (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES article_generation_jobs(id),
-    level VARCHAR(50) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    retry_count INT NOT NULL DEFAULT 0,
-    last_heartbeat_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT uk_subjob_job_level UNIQUE (job_id, level)
-);
-
-CREATE TABLE article_generation_step_jobs (
-    id                UUID PRIMARY KEY,
-    sub_job_id        UUID NOT NULL REFERENCES article_generation_sub_jobs(id),
-    step_type         VARCHAR(20)  NOT NULL,  -- CONTENT | VOCABULARY | QUIZ
-    status            VARCHAR(20)  NOT NULL,  -- PENDING | PROCESSING | COMPLETED | FAILED
-    attempt_count     INT          NOT NULL DEFAULT 0,
-    started_at        TIMESTAMP WITH TIME ZONE,
-    completed_at      TIMESTAMP WITH TIME ZONE,
-    last_heartbeat_at TIMESTAMP WITH TIME ZONE,
-    validation_status VARCHAR(20),            -- PASS | FAIL
-    validation_errors TEXT,
-    error_message     TEXT,
-    created_at        TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at        TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT uk_step_job_sub_job_step UNIQUE (sub_job_id, step_type)
-);
-
-CREATE INDEX idx_step_jobs_status ON article_generation_step_jobs(status);
-CREATE INDEX idx_step_jobs_sub_job_id ON article_generation_step_jobs(sub_job_id);
