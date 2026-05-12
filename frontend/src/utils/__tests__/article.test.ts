@@ -1,6 +1,23 @@
-import { describe, it, expect } from 'vitest';
-import { mapBackendQuizzes, mapDetailDtoToArticle } from '../article';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mapBackendQuizzes, mapDetailDtoToArticle, resolveAvailableLevel, fetchDetailWithFallback } from '../article';
+import { fetchArticleDetail, ApiError } from '../../api/client';
 import type { ArticleDetailDto, QuizDto, VocabularyDto } from '../../api/types';
+
+vi.mock('../../api/client', () => {
+  class MockApiError extends Error {
+    status: number;
+    body: { error: string; message: string };
+    constructor(status: number, body: { error: string; message: string }) {
+      super(body.message);
+      this.status = status;
+      this.body = body;
+      this.name = 'ApiError';
+    }
+  }
+  return { fetchArticleDetail: vi.fn(), ApiError: MockApiError };
+});
+
+const mockFetch = vi.mocked(fetchArticleDetail);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,5 +179,88 @@ describe('mapDetailDtoToArticle', () => {
     const dto = makeDetailDto();
     const article = mapDetailDtoToArticle(dto);
     expect(article.readTime).toBeTruthy();
+  });
+});
+
+// ── resolveAvailableLevel ─────────────────────────────────────────────────────
+
+describe('resolveAvailableLevel', () => {
+  it('returns preferred level when it is in availableLevels', () => {
+    expect(resolveAvailableLevel('HARD', ['EASY', 'MEDIUM', 'HARD'])).toBe('HARD');
+  });
+
+  it('returns MEDIUM when preferred is not available but MEDIUM is', () => {
+    expect(resolveAvailableLevel('HARD', ['EASY', 'MEDIUM'])).toBe('MEDIUM');
+  });
+
+  it('returns first available level when neither preferred nor MEDIUM exist', () => {
+    expect(resolveAvailableLevel('HARD', ['EASY'])).toBe('EASY');
+  });
+
+  it('returns preferred when availableLevels is undefined (unknown)', () => {
+    expect(resolveAvailableLevel('HARD', undefined)).toBe('HARD');
+  });
+
+  it('returns preferred when availableLevels is empty', () => {
+    expect(resolveAvailableLevel('MEDIUM', [])).toBe('MEDIUM');
+  });
+
+  it('returns preferred when it is the only available level', () => {
+    expect(resolveAvailableLevel('EASY', ['EASY'])).toBe('EASY');
+  });
+});
+
+// ── fetchDetailWithFallback ───────────────────────────────────────────────────
+
+describe('fetchDetailWithFallback', () => {
+  const detail404Error = () =>
+    new (ApiError as unknown as new (s: number, b: { error: string; message: string }) => InstanceType<typeof ApiError>)(
+      404,
+      { error: 'Not Found', message: 'Level not available' },
+    );
+
+  const sampleDetail = makeDetailDto({ id: 'art-1' });
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('returns detail directly when fetch succeeds on first try', async () => {
+    mockFetch.mockResolvedValue(sampleDetail);
+    const result = await fetchDetailWithFallback('art-1', 'HARD');
+    expect(result).toBe(sampleDetail);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith('art-1', 'HARD');
+  });
+
+  it('falls back to MEDIUM when preferred level returns 404', async () => {
+    const mediumDetail = makeDetailDto({ id: 'art-1', content: { ...makeDetailDto().content, level: 'MEDIUM' } });
+    mockFetch.mockRejectedValueOnce(detail404Error()).mockResolvedValueOnce(mediumDetail);
+    const result = await fetchDetailWithFallback('art-1', 'HARD');
+    expect(result).toBe(mediumDetail);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(1, 'art-1', 'HARD');
+    expect(mockFetch).toHaveBeenNthCalledWith(2, 'art-1', 'MEDIUM');
+  });
+
+  it('throws when both preferred and MEDIUM fallback fail', async () => {
+    mockFetch
+      .mockRejectedValueOnce(detail404Error())
+      .mockRejectedValueOnce(new Error('MEDIUM also unavailable'));
+    await expect(fetchDetailWithFallback('art-1', 'HARD')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry when preferred level is already MEDIUM and gets 404', async () => {
+    mockFetch.mockRejectedValue(detail404Error());
+    await expect(fetchDetailWithFallback('art-1', 'MEDIUM')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows non-404 errors without retrying', async () => {
+    const networkErr = new Error('Network error');
+    mockFetch.mockRejectedValue(networkErr);
+    await expect(fetchDetailWithFallback('art-1', 'HARD')).rejects.toBe(networkErr);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
