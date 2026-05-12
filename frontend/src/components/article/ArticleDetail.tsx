@@ -140,7 +140,12 @@ export default function ArticleDetail({
         <div style={{ padding: '20px 20px 40px' }}>
 
           {/* Level switcher (not sticky, UI_POLICY §4.2) */}
-          <InlineLevelSwitcher currentLevel={currentLevel} onSwitch={handleLevelSwitch} />
+          <InlineLevelSwitcher
+            currentLevel={currentLevel}
+            onSwitch={handleLevelSwitch}
+            disabled={isLoading}
+            availableLevels={article.availableLevels}
+          />
 
           {/* Loading Overlay (Problem 3) - now covers title/meta/body/quiz */}
           <div style={{ position: 'relative', minHeight: 400 }}>

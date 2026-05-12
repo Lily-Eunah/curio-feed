@@ -106,8 +106,10 @@ export default function App() {
   }, [appState.onboarded, appState.userLevel, appState.selectedCategory]);
 
   useEffect(() => {
-    loadFeed();
-  }, [loadFeed]);
+    if (screen === 'feed') {
+      loadFeed();
+    }
+  }, [loadFeed, screen]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -128,7 +130,13 @@ export default function App() {
     const existing = articles.find(a => a.id === id);
     if (existing && existing.body === '') {
       try {
-        const detail = await fetchArticleDetail(id, appState.userLevel);
+        const detail = await fetchArticleDetail(id, appState.userLevel).catch(async (err) => {
+          // Fallback: if user's preferred level is unavailable, try MEDIUM
+          if (err?.status === 404 && appState.userLevel !== 'MEDIUM') {
+            return fetchArticleDetail(id, 'MEDIUM');
+          }
+          throw err;
+        });
         setArticles(prev => prev.map(a => a.id === id ? mapFullArticle(detail, a) : a));
       } catch (err) {
         console.error('Failed to fetch article detail:', err);
@@ -211,20 +219,23 @@ export default function App() {
   }, [setAppState]);
 
   const handleLevelChangeFromArticle = useCallback(async (level: DifficultyLevel) => {
-    setAppState({ userLevel: level });
-    if (currentArticleId) {
-      setLoadingDetail(true);
-      try {
-        const detail = await fetchArticleDetail(currentArticleId, level);
-        setArticles(prev => prev.map(a => a.id === currentArticleId ? mapFullArticle(detail, a) : a));
-      } catch (err) {
-        console.error('Failed to switch level:', err);
-        showToast('Failed to load level details');
-      } finally {
-        setLoadingDetail(false);
-      }
+    if (!currentArticleId || loadingDetail) return;
+    
+    setLoadingDetail(true);
+    try {
+      const detail = await fetchArticleDetail(currentArticleId, level);
+      // Success: update both level and article content
+      setAppState({ userLevel: level });
+      setArticles(prev => prev.map(a => a.id === currentArticleId ? mapFullArticle(detail, a) : a));
+    } catch (err) {
+      console.error('Failed to switch level:', err);
+      showToast('Failed to load level details');
+      // If it fails, we keep appState.userLevel as the OLD level.
+      // ArticleDetail will sync back to the old level via prop.
+    } finally {
+      setLoadingDetail(false);
     }
-  }, [currentArticleId, setAppState, showToast]);
+  }, [currentArticleId, loadingDetail, setAppState, showToast]);
 
   const handleNextArticle = useCallback((id: string) => {
     setCurrentArticleId(id);

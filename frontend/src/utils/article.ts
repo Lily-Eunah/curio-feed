@@ -176,5 +176,6 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     })),
     body: dto.content.content,
     quiz: { q1, q2, q3 },
+    availableLevels: dto.availableLevels,
   };
 }

@@ -5,15 +5,20 @@ import type { DifficultyLevel } from '../../types';
 interface Props {
   currentLevel: DifficultyLevel;
   onSwitch: (level: DifficultyLevel) => void;
+  disabled?: boolean;
+  availableLevels?: DifficultyLevel[];
 }
 
 const LEVELS: DifficultyLevel[] = ['EASY', 'MEDIUM', 'HARD'];
 
-export default memo(function InlineLevelSwitcher({ currentLevel, onSwitch }: Props) {
+export default memo(function InlineLevelSwitcher({ currentLevel, onSwitch, disabled, availableLevels }: Props) {
   const idx = LEVELS.indexOf(currentLevel);
   const cfg = LEVEL_CONFIG[currentLevel];
-  const canEasier = idx > 0;
-  const canHarder = idx < 2;
+  // When availableLevels is known, disable buttons for levels that don't exist in this article
+  const isLevelAvailable = (lvl: DifficultyLevel) =>
+    availableLevels == null || availableLevels.includes(lvl);
+  const canEasier = idx > 0 && isLevelAvailable(LEVELS[idx - 1]);
+  const canHarder = idx < 2 && isLevelAvailable(LEVELS[idx + 1]);
 
   const segBtn = (
     label: React.ReactNode,
@@ -53,13 +58,15 @@ export default memo(function InlineLevelSwitcher({ currentLevel, onSwitch }: Pro
         borderRadius: 10,
         overflow: 'hidden',
         marginBottom: 20,
+        opacity: disabled ? 0.6 : 1,
+        pointerEvents: disabled ? 'none' : 'all',
       }}
     >
-      {segBtn(<>← Easier</>, false, !canEasier, canEasier ? () => onSwitch(LEVELS[idx - 1]) : null)}
+      {segBtn(<>← Easier</>, false, !canEasier || !!disabled, canEasier ? () => onSwitch(LEVELS[idx - 1]) : null)}
       <div style={{ width: 1, background: COLORS.border, flexShrink: 0 }} />
       {segBtn(cfg.label, true, false, null)}
       <div style={{ width: 1, background: COLORS.border, flexShrink: 0 }} />
-      {segBtn(<>Harder →</>, false, !canHarder, canHarder ? () => onSwitch(LEVELS[idx + 1]) : null)}
+      {segBtn(<>Harder →</>, false, !canHarder || !!disabled, canHarder ? () => onSwitch(LEVELS[idx + 1]) : null)}
     </div>
   );
 });
