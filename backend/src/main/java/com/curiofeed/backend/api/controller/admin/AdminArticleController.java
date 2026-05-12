@@ -55,9 +55,9 @@ public class AdminArticleController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<Page<AdminArticleListResponse>> listArticles(
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
@@ -105,7 +105,7 @@ public class AdminArticleController {
      */
     @GetMapping("/{articleId}")
     @Transactional(readOnly = true)
-    public ResponseEntity<com.curiofeed.backend.api.dto.admin.AdminArticleDetailResponse> getArticleDetail(@PathVariable UUID articleId) {
+    public ResponseEntity<com.curiofeed.backend.api.dto.admin.AdminArticleDetailResponse> getArticleDetail(@PathVariable("articleId") UUID articleId) {
         return articleRepository.findById(articleId)
                 .map(article -> {
                     var jobOpt = jobRepository.findByArticleId(articleId);
@@ -145,7 +145,7 @@ public class AdminArticleController {
      */
     @GetMapping("/{articleId}/generation-status")
     @Transactional(readOnly = true)
-    public ResponseEntity<?> getGenerationStatus(@PathVariable UUID articleId) {
+    public ResponseEntity<?> getGenerationStatus(@PathVariable("articleId") UUID articleId) {
         return articleRepository.findById(articleId)
                 .map(article -> {
                     var jobOpt = jobRepository.findByArticleId(articleId);
@@ -187,9 +187,9 @@ public class AdminArticleController {
     @PostMapping("/{articleId}/generation-jobs/{jobId}/sub-jobs/{subJobId}/retry")
     @Transactional
     public ResponseEntity<?> retrySubJob(
-            @PathVariable UUID articleId,
-            @PathVariable UUID jobId,
-            @PathVariable UUID subJobId) {
+            @PathVariable("articleId") UUID articleId,
+            @PathVariable("jobId") UUID jobId,
+            @PathVariable("subJobId") UUID subJobId) {
 
         ArticleGenerationSubJob subJob = subJobRepository.findById(subJobId)
                 .orElse(null);
@@ -216,10 +216,10 @@ public class AdminArticleController {
      */
     @PostMapping("/{articleId}/generation-jobs/{jobId}/sub-jobs/{subJobId}/steps/{stepType}/retry")
     public ResponseEntity<?> retryStep(
-            @PathVariable UUID articleId,
-            @PathVariable UUID jobId,
-            @PathVariable UUID subJobId,
-            @PathVariable String stepType) {
+            @PathVariable("articleId") UUID articleId,
+            @PathVariable("jobId") UUID jobId,
+            @PathVariable("subJobId") UUID subJobId,
+            @PathVariable("stepType") String stepType) {
 
         GenerationStepType step;
         try {
@@ -259,7 +259,7 @@ public class AdminArticleController {
     @PatchMapping("/{articleId}/status")
     @Transactional
     public ResponseEntity<?> updateStatus(
-            @PathVariable UUID articleId,
+            @PathVariable("articleId") UUID articleId,
             @RequestBody UpdateArticleStatusRequest request) {
 
         ArticleStatus newStatus;

@@ -22,9 +22,9 @@ public class QuizAttemptController {
 
     @PostMapping("/{quizId}/attempts")
     public ResponseEntity<QuizAttemptResponse> attemptQuiz(
-            @PathVariable UUID articleId,
-            @PathVariable UUID contentId,
-            @PathVariable UUID quizId,
+            @PathVariable("articleId") UUID articleId,
+            @PathVariable("contentId") UUID contentId,
+            @PathVariable("quizId") UUID quizId,
             @RequestBody QuizAttemptRequest request
     ) {
         QuizAttemptResponse response = quizService.attemptQuiz(articleId, contentId, quizId, request);
