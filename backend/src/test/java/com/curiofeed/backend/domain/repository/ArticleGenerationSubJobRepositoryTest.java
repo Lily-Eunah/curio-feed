@@ -1,10 +1,7 @@
 package com.curiofeed.backend.domain.repository;
 
 import com.curiofeed.backend.config.JpaConfig;
-import com.curiofeed.backend.domain.entity.ArticleGenerationJob;
-import com.curiofeed.backend.domain.entity.ArticleGenerationSubJob;
-import com.curiofeed.backend.domain.entity.DifficultyLevel;
-import com.curiofeed.backend.domain.entity.JobStatus;
+import com.curiofeed.backend.domain.entity.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,12 +40,32 @@ class ArticleGenerationSubJobRepositoryTest {
     @Autowired
     private TestEntityManager entityManager;
 
+    private ArticleGenerationJob createTestJob() {
+        String uniqueSuffix = UUID.randomUUID().toString();
+        Category category = new Category("tech-" + uniqueSuffix, "Technology", 1, true);
+        entityManager.persist(category);
+
+        Article article = Article.create(
+                "AI is changing the world",
+                "TechNews",
+                "https://example.com/ai-news-" + uniqueSuffix,
+                "Content",
+                Instant.now(),
+                category,
+                "ai-news-" + uniqueSuffix
+        );
+        entityManager.persist(article);
+
+        ArticleGenerationJob job = new ArticleGenerationJob(article.getId(), JobStatus.PENDING);
+        entityManager.persistAndFlush(job);
+        return job;
+    }
+
     @Test
     @DisplayName("SubJob을 정상적으로 저장하고 조회할 수 있다")
     void saveAndFindSubJob() {
         // given
-        ArticleGenerationJob job = new ArticleGenerationJob(UUID.randomUUID(), JobStatus.PENDING);
-        entityManager.persistAndFlush(job);
+        ArticleGenerationJob job = createTestJob();
 
         ArticleGenerationSubJob subJob = new ArticleGenerationSubJob(job, DifficultyLevel.EASY, JobStatus.PENDING);
         
@@ -71,8 +88,7 @@ class ArticleGenerationSubJobRepositoryTest {
     @DisplayName("SubJob은 동일한 Job의 동일한 Level에 대해 Unique 속성을 가진다")
     void uniqueConstraintJobIdAndLevel() {
         // given
-        ArticleGenerationJob job = new ArticleGenerationJob(UUID.randomUUID(), JobStatus.PENDING);
-        entityManager.persistAndFlush(job);
+        ArticleGenerationJob job = createTestJob();
 
         ArticleGenerationSubJob subJob1 = new ArticleGenerationSubJob(job, DifficultyLevel.EASY, JobStatus.PENDING);
         subJobRepository.saveAndFlush(subJob1);
@@ -89,8 +105,7 @@ class ArticleGenerationSubJobRepositoryTest {
     @DisplayName("SubJob의 상태와 Heartbeat를 정상적으로 업데이트할 수 있다")
     void updateSubJobFields() {
         // given
-        ArticleGenerationJob job = new ArticleGenerationJob(UUID.randomUUID(), JobStatus.PENDING);
-        entityManager.persistAndFlush(job);
+        ArticleGenerationJob job = createTestJob();
 
         ArticleGenerationSubJob subJob = new ArticleGenerationSubJob(job, DifficultyLevel.HARD, JobStatus.PENDING);
         ArticleGenerationSubJob savedSubJob = subJobRepository.saveAndFlush(subJob);

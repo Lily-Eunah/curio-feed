@@ -37,6 +37,7 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
     int tryLockSubJob(@Param("id") UUID id);
 
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE ArticleGenerationSubJob s SET s.lastHeartbeatAt = :heartbeat WHERE s.id = :id")
     void updateHeartbeat(@Param("id") UUID id, @Param("heartbeat") Instant heartbeat);
 
@@ -47,6 +48,7 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
      * Admin API 전용: FAILED SubJob을 PENDING으로 재설정, retryCount=0으로 초기화.
      */
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE ArticleGenerationSubJob s SET s.status = 'PENDING', s.retryCount = 0 WHERE s.id = :id")
     void resetToPendingWithRetryReset(@Param("id") UUID id);
 
@@ -55,6 +57,7 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
      * JPQL direct UPDATE 예외 허용 케이스 (stale 복구, 상태 검증 우회 의도적).
      */
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE ArticleGenerationSubJob s SET s.status = 'PENDING' WHERE s.id = :id AND s.status = 'PROCESSING'")
     void resetToPending(@Param("id") UUID id);
 
@@ -62,6 +65,7 @@ public interface ArticleGenerationSubJobRepository extends JpaRepository<Article
      * ReconciliationScheduler 전용: FAILED 강제 설정.
      */
     @Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE ArticleGenerationSubJob s SET s.status = :status WHERE s.id = :id")
     void forceSetStatus(@Param("id") UUID id, @Param("status") JobStatus status);
 

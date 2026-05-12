@@ -1,6 +1,7 @@
 package com.curiofeed.backend.infrastructure.llm;
 
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
+import com.curiofeed.backend.infrastructure.llm.validation.ContentValidationResult;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,52 +21,91 @@ public class ThreeStepPromptBuilder {
 
     // ── Step 1: Content ───────────────────────────────────────────────────────
 
-    public String buildContentPrompt(String originalArticle, DifficultyLevel level) {
+    public String buildSourceDigestPrompt(String originalArticle) {
+        return """
+                You are a precise information analyst.
+                Your task is to compress a long news article into a structured "Source Digest" that will be used by another AI to write a short version for language learners.
+
+                COMPRESSION RULES:
+                1. DO NOT write a story. Extract core information in bullet points or short sentences.
+                2. PRESERVE: Central story, main actors, main cause-effect relationships, and the final outcome.
+                3. REMOVE: Minor examples, repeated details, secondary quotes, scene-setting descriptions, and non-essential background.
+                4. DO NOT add any information or interpretations not present in the original article.
+                5. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
+
+                Return ONLY this JSON:
+                {
+                  "sourceDigest": {
+                    "centralStory": "1-2 sentences summarizing the main event",
+                    "coreFacts": ["Fact 1", "Fact 2", ...],
+                    "supportingDetails": ["Detail 1", ...],
+                    "omittedDetails": ["Briefly list what was removed (e.g., 'specific weather descriptions', 'secondary quotes from neighbors')"]
+                  }
+                }
+
+                [ORIGINAL ARTICLE]
+                %s
+                """.formatted(originalArticle);
+    }
+
+    public String buildContentPrompt(String sourceText, DifficultyLevel level, boolean isDigestBased) {
+        String sourceContext = isDigestBased
+                ? "You are writing from a compressed SOURCE DIGEST, not from the full article. Use ONLY the facts in the digest. Do not try to restore omitted details."
+                : "You are writing from the ORIGINAL ARTICLE provided below.";
+
         String spec = switch (level) {
             case EASY -> """
                     EASY (A2-B1 level):
                     • Keep sentences short — aim for 12-15 words per sentence.
                     • Use only common vocabulary a 10-year-old native speaker would know.
-                    • Replace difficult words with simpler ones — NEVER remove facts.
-                    • Cover ALL key events, causes, and consequences from the original.
-                    • Write AT LEAST 180 words. Write AT MOST 260 words.
-                    • If your draft is shorter than 180 words, add more facts from the original.""";
+                    • Explain difficult ideas in simple words.
+                    • Include about 5-6 core facts from the source.
+                    • Target: 180~260 words.
+                    • Absolute hard limit: 320 words.""";
             case MEDIUM -> """
                     MEDIUM (B1-B2 level):
                     • Natural news-writing style with moderate sentence variety.
-                    • Topic-specific vocabulary is acceptable.
-                    • Retain all cause-effect relationships, actor motivations, and key figures.
-                    • Write AT LEAST 220 words. Write AT MOST 320 words.
-                    • If your draft is shorter than 220 words, expand each key event with more detail.""";
+                    • Topic-specific vocabulary is acceptable if context makes it clear.
+                    • Include about 6-8 core facts from the source.
+                    • Preserve the main cause-effect relationships and actor motivations.
+                    • Target: 220~320 words.
+                    • Absolute hard limit: 380 words.""";
             case HARD -> """
                     HARD (C1 level):
-                    • Advanced vocabulary and complex, varied sentence structures.
-                    • Formal, precise register. Dense information delivery.
+                    • Use advanced vocabulary and varied sentence structures.
+                    • Use formal, precise register with dense information delivery.
                     • Preserve nuance, expert viewpoints, and causal chains.
-                    • Write AT LEAST 280 words. Write AT MOST 420 words.
-                    • If your draft is shorter than 280 words, include additional context and background.""";
+                    • Include about 8-10 core facts from the source.
+                    • Target: 280~420 words.
+                    • Absolute hard limit: 500 words.""";
         };
 
         return """
-                You are an expert English content rewriter for language learners.
+                You are an expert English content adapter for language learners.
 
-                Rewrite the news article below at the reading level specified.
-
-                LEVEL AND WORD COUNT REQUIREMENTS:
                 %s
 
-                RULES:
-                1. REWRITE, not summarise. Every key fact, event, and causal link must appear.
-                2. Do NOT add information not in the original.
-                3. Natural flowing prose — no bullet points, headers, or lists.
-                4. Check your word count. If below the minimum, add more detail from the original.
+                LEVEL REQUIREMENTS:
+                %s
+
+                STRICT LENGTH POLICY — HIGHEST PRIORITY:
+                1. The absolute hard limit is mandatory. NEVER exceed it.
+                2. Aim for the target range (preferred range).
+                3. Word limit is more important than preserving every detail.
+                4. Check your word count. If below the target minimum, add more detail from the source.
+
+                CONTENT SELECTION RULES:
+                1. Preserve the central story, main actors, main event, main causes, and main consequences.
+                2. Omit minor examples, repeated details, secondary quotes, and non-essential background.
+                3. Do NOT add information not found in the source.
+                4. Natural flowing prose only — no bullet points, headers, or lists.
 
                 Return ONLY this JSON — no other text, no markdown:
                 {"content": "your rewritten article here"}
 
-                [ORIGINAL ARTICLE]
+                [SOURCE TEXT]
                 %s
-                """.formatted(spec, originalArticle);
+                """.formatted(sourceContext, spec, sourceText);
     }
 
     // ── Step 2: Vocabulary ────────────────────────────────────────────────────
@@ -247,20 +287,36 @@ public class ThreeStepPromptBuilder {
 
     /**
      * Builds a corrective retry prompt for Step 1.
-     * @param retryReason "too_short" | "too_long" | other (no special correction added)
      */
-    public String buildContentRetryPrompt(String originalArticle, DifficultyLevel level, String retryReason) {
+    public String buildContentRetryPrompt(String sourceText, DifficultyLevel level,
+                                          ContentValidationResult result, boolean isDigestBased) {
+        String retryReason = result.getRetryReason();
+        int actual = result.getActualWordCount();
+        int hardMin = result.getHardMin();
+        int hardMax = result.getHardMax();
+        int prefMin = result.getPreferredMin();
+        int prefMax = result.getPreferredMax();
+
         String correction = switch (retryReason) {
-            case "too_short" -> "\n⚠ CORRECTION: The previous draft was too short. " +
-                    "Expand the article while preserving the same level and all key facts.";
-            case "too_long"  -> "\n⚠ CORRECTION: The previous draft was too long. " +
-                    "Rewrite more concisely while preserving ALL key facts.";
-            default          -> "";
+            case "too_short" -> """
+                    
+                    ⚠ CORRECTION: The previous draft was too short (%d words, hard minimum is %d).
+                    Expand the article to the preferred range (%d~%d words).
+                    Add more details from the source (central story, core facts, background).
+                    STAY BELOW the absolute hard limit of %d words.""".formatted(actual, hardMin, prefMin, prefMax, hardMax);
+            case "too_long" -> """
+                    
+                    ⚠ CORRECTION: The previous draft was too long (%d words, absolute hard limit is %d).
+                    Rewrite more concisely to fit the preferred range (%d~%d words).
+                    STRICT WORD LIMIT IS HIGHER PRIORITY than detail preservation.
+                    Remove minor background, repeated details, and secondary quotes.
+                    Keep only the central event, main actors, and main consequences.""".formatted(actual, hardMax, prefMin, prefMax);
+            default -> "";
         };
-        String base = buildContentPrompt(originalArticle, level);
-        // Insert the correction instruction after the first line (after the system persona)
+
+        String base = buildContentPrompt(sourceText, level, isDigestBased);
         return base.replaceFirst(
-                "(You are an expert English content rewriter for language learners\\.)",
+                "(You are an expert English content adapter for language learners\\.)",
                 "$1" + correction);
     }
 
@@ -301,6 +357,27 @@ public class ThreeStepPromptBuilder {
                 "$1" + correction);
     }
 
+
+    public static Map<String, Object> sourceDigestSchema() {
+        Map<String, Object> digestProps = new LinkedHashMap<>();
+        digestProps.put("centralStory", Map.of("type", "string"));
+        digestProps.put("coreFacts", Map.of("type", "array", "items", Map.of("type", "string")));
+        digestProps.put("supportingDetails", Map.of("type", "array", "items", Map.of("type", "string")));
+        digestProps.put("omittedDetails", Map.of("type", "array", "items", Map.of("type", "string")));
+
+        Map<String, Object> digestObj = new LinkedHashMap<>();
+        digestObj.put("type", "object");
+        digestObj.put("required", List.of("centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
+        digestObj.put("properties", digestProps);
+        digestObj.put("additionalProperties", false);
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("required", List.of("sourceDigest"));
+        schema.put("properties", Map.of("sourceDigest", digestObj));
+        schema.put("additionalProperties", false);
+        return schema;
+    }
 
     public static Map<String, Object> contentSchema() {
         Map<String, Object> props = new LinkedHashMap<>();

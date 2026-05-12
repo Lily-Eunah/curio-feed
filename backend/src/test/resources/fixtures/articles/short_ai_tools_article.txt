@@ -1,0 +1,7 @@
+A group of small businesses in Seoul has started testing artificial intelligence tools to help workers handle daily tasks more quickly. The tools are used to draft simple emails, summarize customer questions, organize meeting notes, and prepare first versions of product descriptions.
+
+                Several shop owners said the technology saves time, especially during busy hours when staff must answer online messages while also helping customers in person. One bakery owner said the tool does not replace workers, but it helps them avoid spending too much time on repeated writing tasks.
+
+                Experts say these systems can be useful when people check the results carefully. They warn that AI tools may make mistakes, misunderstand local context, or produce text that sounds confident but is not fully accurate. For that reason, many companies are training employees to review AI-generated work before sending it to customers.
+
+                Supporters believe the technology can give smaller companies access to services that once required larger teams. Critics say businesses should be careful not to depend on the tools too heavily. The early results suggest that AI is most helpful when it acts as an assistant rather than a final decision-maker.
