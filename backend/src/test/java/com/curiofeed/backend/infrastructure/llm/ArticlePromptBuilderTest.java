@@ -39,4 +39,25 @@ class ArticlePromptBuilderTest {
         String prompt = builder.build("Some content", DifficultyLevel.MEDIUM);
         assertThat(prompt).contains("Do NOT include");
     }
+
+    @Test
+    @DisplayName("생성 프롬프트에 3~4 문단 지침이 포함된다")
+    void build_containsParagraphGuideline() {
+        String prompt = builder.build("Some content", DifficultyLevel.EASY);
+        assertThat(prompt).contains("3 to 4 natural paragraphs");
+    }
+
+    @Test
+    @DisplayName("생성 프롬프트에 빈 줄 구분 지침이 포함된다")
+    void build_containsBlankLineSeparation() {
+        String prompt = builder.build("Some content", DifficultyLevel.MEDIUM);
+        assertThat(prompt).contains("Separate paragraphs with a blank line");
+    }
+
+    @Test
+    @DisplayName("생성 프롬프트에 bullet list 금지 지침이 포함된다")
+    void build_containsBulletListProhibition() {
+        String prompt = builder.build("Some content", DifficultyLevel.HARD);
+        assertThat(prompt).contains("Do not use bullet points, numbered lists");
+    }
 }

@@ -26,6 +26,16 @@ public class ArticlePromptBuilder {
 
             ---
 
+            [PARAGRAPH FORMAT]
+
+            - Write the article in 3 to 4 natural paragraphs.
+            - Do not return one large block of text.
+            - Separate paragraphs with a blank line.
+            - Each paragraph should cover one coherent idea or stage of the story.
+            - Do not use bullet points, numbered lists, or line breaks after every sentence.
+
+            ---
+
             [VOCABULARY RULES]
 
             - Include EXACTLY 5 items

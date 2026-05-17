@@ -100,6 +100,13 @@ public class ThreeStepPromptBuilder {
                 3. Do NOT add information not found in the source.
                 4. Natural flowing prose only — no bullet points, headers, or lists.
 
+                PARAGRAPH FORMAT — REQUIRED:
+                • Write the article in 3 to 4 natural paragraphs.
+                • Do not return one large block of text.
+                • Separate paragraphs with a blank line.
+                • Each paragraph should cover one coherent idea or stage of the story.
+                • Do not use bullet points, numbered lists, or line breaks after every sentence.
+
                 Return ONLY this JSON — no other text, no markdown:
                 {"content": "your rewritten article here"}
 
