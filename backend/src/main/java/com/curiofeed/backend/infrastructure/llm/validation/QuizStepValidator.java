@@ -17,12 +17,14 @@ import java.util.regex.Pattern;
  * Hard gates:
  *   - Exactly 3 quizzes (Q1=MCQ, Q2=MCQ, Q3=SHORT_ANSWER)
  *   - Each MCQ has exactly 4 choices
- *   - Q3 options is empty object
+ *   - MCQ correctAnswer must be A/B/C/D and must not be blank
+ *   - Q3 options is empty
  *
  * Soft warnings:
  *   - Q1 appears to be a shallow factual-lookup
- *   - Q2 does not reference a vocab word
- *   - Q3 answer not in vocab list
+ *   - Q2 appears to be a vocabulary-definition question (not passage reasoning)
+ *   - Q3 correctAnswer (model answer) does not contain a vocab word
+ *   - Q3 question does not reference the article or a vocab word
  */
 @Component
 public class QuizStepValidator {
@@ -36,6 +38,14 @@ public class QuizStepValidator {
         "(?i)which\\s+country|" +
         "(?i)when\\s+did|" +
         "(?i)what\\s+date"
+    );
+
+    // Patterns suggesting Q2 is a vocab-definition MCQ rather than passage reasoning
+    private static final Pattern VOCAB_DEFINITION_PATTERN = Pattern.compile(
+        "(?i)which\\s+sentence\\s+uses|" +
+        "(?i)which\\s+word\\s+fits|" +
+        "(?i)which\\s+option\\s+correctly\\s+uses|" +
+        "(?i)choose\\s+the\\s+sentence\\s+that\\s+(best\\s+)?uses"
     );
 
     public List<String> validate(List<QuizData> quizzes, List<VocabularyData> vocabs) {
@@ -53,7 +63,7 @@ public class QuizStepValidator {
         List<String> vocabWords = vocabs == null ? List.of()
                 : vocabs.stream().map(v -> v.word().toLowerCase(Locale.ROOT)).toList();
 
-        // Q1 — must be MULTIPLE_CHOICE, comprehension
+        // Q1 — must be MULTIPLE_CHOICE, passage comprehension
         QuizData q1 = quizzes.get(0);
         if (q1.type() != QuizType.MULTIPLE_CHOICE) {
             errors.add("quiz[0] must be MULTIPLE_CHOICE, got " + q1.type());
@@ -64,41 +74,43 @@ public class QuizStepValidator {
             }
         }
 
-        // Q2 — must be MULTIPLE_CHOICE, vocabulary application
+        // Q2 — must be MULTIPLE_CHOICE, passage reasoning
         QuizData q2 = quizzes.get(1);
         if (q2.type() != QuizType.MULTIPLE_CHOICE) {
             errors.add("quiz[1] must be MULTIPLE_CHOICE, got " + q2.type());
         } else {
             validateMcqChoices(q2, 1, errors);
-            // Q2 should reference a vocab word in its choices
-            boolean q2UsesVocab = false;
-            if (q2.options() != null && q2.options().getChoices() != null) {
-                q2UsesVocab = q2.options().getChoices().stream()
-                        .anyMatch(c -> c.getText() != null && vocabWords.stream()
-                                .anyMatch(w -> c.getText().toLowerCase(Locale.ROOT).contains(w)));
-            }
-            if (!q2UsesVocab) {
-                errors.add("[SOFT] quiz[1] (Q2) choices do not appear to contain a vocab word — may not be vocabulary-application");
+            if (q2.question() != null && VOCAB_DEFINITION_PATTERN.matcher(q2.question()).find()) {
+                errors.add("[SOFT] quiz[1] (Q2) appears to be a vocabulary-definition question, not passage reasoning: " + q2.question());
             }
         }
 
-        // Q3 — must be SHORT_ANSWER, answer must be in vocab list
+        // Q3 — must be SHORT_ANSWER; correctAnswer is a model-answer sentence containing a vocab word
         QuizData q3 = quizzes.get(2);
         if (q3.type() != QuizType.SHORT_ANSWER) {
             errors.add("quiz[2] must be SHORT_ANSWER, got " + q3.type());
         } else {
-            // options must be empty
             boolean optionsEmpty = q3.options() == null
                     || (q3.options().getChoices() == null || q3.options().getChoices().isEmpty());
             if (!optionsEmpty) {
                 errors.add("[SOFT] quiz[2] SHORT_ANSWER options should be empty but contains data");
             }
-            // answer must be in vocab list
-            if (q3.correctAnswer() != null) {
-                String answer = q3.correctAnswer().toLowerCase(Locale.ROOT).trim();
-                boolean inVocab = vocabWords.contains(answer);
-                if (!inVocab) {
-                    errors.add("[SOFT] quiz[2] correctAnswer '" + q3.correctAnswer() + "' not found in vocab list " + vocabWords);
+            // Model answer (correctAnswer) should contain a vocab word
+            if (q3.correctAnswer() != null && !vocabWords.isEmpty()) {
+                String answerLower = q3.correctAnswer().toLowerCase(Locale.ROOT);
+                boolean containsVocab = vocabWords.stream().anyMatch(answerLower::contains);
+                if (!containsVocab) {
+                    errors.add("[SOFT] quiz[2] correctAnswer does not contain any vocab word — " +
+                               "model answer should use the target vocabulary word");
+                }
+            }
+            // Question should explicitly name the target vocab word (soft check)
+            if (q3.question() != null && !vocabWords.isEmpty()) {
+                String questionLower = q3.question().toLowerCase(Locale.ROOT);
+                boolean questionMentionsVocab = vocabWords.stream().anyMatch(questionLower::contains);
+                if (!questionMentionsVocab) {
+                    errors.add("[SOFT] quiz[2] question does not mention a vocab word — " +
+                               "Q3 should ask the learner to use a specific vocabulary word");
                 }
             }
         }

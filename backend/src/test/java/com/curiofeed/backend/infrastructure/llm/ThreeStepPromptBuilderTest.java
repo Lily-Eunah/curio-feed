@@ -75,4 +75,75 @@ class ThreeStepPromptBuilderTest {
         assertThat(digestPrompt).contains("SOURCE DIGEST");
         assertThat(originalPrompt).contains("ORIGINAL ARTICLE");
     }
+
+    // ── buildQuizPrompt ──────────────────────────────────────────────────────────
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: Q1은 passage comprehension MCQ 지침이 포함된다")
+    void buildQuizPrompt_q1IsPassageComprehension(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).contains("Passage Comprehension");
+        assertThat(prompt).containsAnyOf("main idea", "central point", "central situation", "main concern");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: Q2는 passage reasoning MCQ 지침이 포함된다")
+    void buildQuizPrompt_q2IsPassageReasoning(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).contains("Passage Reasoning");
+        assertThat(prompt).containsAnyOf("cause", "inference", "imply", "infer");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: Q3는 passage-grounded vocabulary SHORT_ANSWER 지침이 포함된다")
+    void buildQuizPrompt_q3IsPassageGroundedShortAnswer(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).contains("SHORT_ANSWER");
+        assertThat(prompt).contains("Passage-Grounded Vocabulary");
+        assertThat(prompt).contains("article");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: Q3 correctAnswer는 vocab word를 포함한 완전한 문장이어야 함을 명시한다")
+    void buildQuizPrompt_q3ModelAnswerMustContainVocabWord(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).containsAnyOf("TARGET_WORD", "target vocab word", "vocabulary word");
+        assertThat(prompt).contains("correctAnswer");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: Q3 단순 fill-in-the-blank 금지 지침이 포함된다")
+    void buildQuizPrompt_q3FillInBlankBanned(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).containsAnyOf("fill-in-the-blank", "unrelated to the article");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildQuizPrompt: MCQ correctAnswer는 A/B/C/D 중 하나여야 함을 명시한다")
+    void buildQuizPrompt_mcqCorrectAnswerMustBeABCD(DifficultyLevel level) {
+        String prompt = builder.buildQuizPrompt("content", "[]", level);
+        assertThat(prompt).contains("\"A\", \"B\", \"C\", or \"D\"");
+    }
+
+    @Test
+    @DisplayName("buildQuizRetryPrompt: q3_not_passage_grounded 수정 지침이 포함된다")
+    void buildQuizRetryPrompt_q3NotPassageGrounded() {
+        String prompt = builder.buildQuizRetryPrompt("content", "[]", DifficultyLevel.MEDIUM, "q3_not_passage_grounded");
+        assertThat(prompt).contains("CORRECTION");
+        assertThat(prompt).containsAnyOf("article content", "vocabulary word");
+    }
+
+    @Test
+    @DisplayName("buildQuizRetryPrompt: q2_not_reasoning 수정 지침이 포함된다")
+    void buildQuizRetryPrompt_q2NotReasoning() {
+        String prompt = builder.buildQuizRetryPrompt("content", "[]", DifficultyLevel.MEDIUM, "q2_not_reasoning");
+        assertThat(prompt).contains("CORRECTION");
+        assertThat(prompt).containsAnyOf("passage reasoning", "cause/effect");
+    }
 }
