@@ -67,6 +67,15 @@ function calcReadingTime(wordCount: number, level?: string): string {
   return `${minutes} min read`;
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────────
+
+/** Converts MCQ letter key (A/B/C/D) to zero-based index. Returns 0 for unknown input. */
+function letterToIndex(letter: string | undefined | null): number {
+  if (!letter) return 0;
+  const idx = letter.trim().toUpperCase().charCodeAt(0) - 65; // 'A'=0, 'B'=1, 'C'=2, 'D'=3
+  return idx >= 0 && idx <= 3 ? idx : 0;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────────
 
 export function mapBackendQuizzes(quizzes: QuizDto[]): MappedQuizzes {
@@ -82,10 +91,7 @@ export function mapBackendQuizzes(quizzes: QuizDto[]): MappedQuizzes {
     : { ...PLACEHOLDER_MCQ };
 
   const q3: MappedSA = sas[0]
-    ? {
-        question: sas[0].question,
-        modelAnswer: (sas[0].options.explanations as Record<string, string> | null)?.modelAnswer ?? '',
-      }
+    ? { question: sas[0].question, modelAnswer: sas[0].correctAnswer ?? '' }
     : { ...PLACEHOLDER_SA };
 
   return { q1, q2, q3 };
@@ -178,7 +184,7 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     ? {
         question: mcqs[0].question,
         options: mcqs[0].options.choices?.map((c) => c.text) ?? [],
-        correct: parseInt(mcqs[0].correctAnswer ?? '0', 10),
+        correct: letterToIndex(mcqs[0].correctAnswer),
         explanation: mcqs[0].explanation ?? '',
       }
     : PLACEHOLDER_QUIZ.q1;
@@ -187,7 +193,7 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     ? {
         question: mcqs[1].question,
         options: mcqs[1].options.choices?.map((c) => c.text) ?? [],
-        correct: parseInt(mcqs[1].correctAnswer ?? '0', 10),
+        correct: letterToIndex(mcqs[1].correctAnswer),
         explanation: mcqs[1].explanation ?? '',
       }
     : { ...q1 };

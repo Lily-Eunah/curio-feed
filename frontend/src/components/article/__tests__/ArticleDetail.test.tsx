@@ -42,10 +42,10 @@ describe('ArticleDetail', () => {
   it('isolates quiz progress by level', () => {
     const quizProgress = {
       'art-1:EASY': {
-        q1: { status: 'done', correct: true, userAnswer: 0, attempts: 1 },
+        q1: { status: 'done' as const, correct: true, userAnswer: 0, attempts: 1 },
       },
       'art-1:MEDIUM': {
-        q1: { status: 'done', correct: false, userAnswer: 1, attempts: 2 },
+        q1: { status: 'done' as const, correct: false, userAnswer: 1, attempts: 2 },
       },
     };
 

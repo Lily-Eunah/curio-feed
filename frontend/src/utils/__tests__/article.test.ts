@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mapBackendQuizzes, mapDetailDtoToArticle, resolveAvailableLevel, fetchDetailWithFallback } from '../article';
+import { mapBackendQuizzes, mapDetailDtoToArticle, mapFullArticle, resolveAvailableLevel, fetchDetailWithFallback } from '../article';
 import { fetchArticleDetail, ApiError } from '../../api/client';
 import type { ArticleDetailDto, QuizDto, VocabularyDto } from '../../api/types';
 
@@ -108,13 +108,11 @@ describe('mapBackendQuizzes', () => {
     expect(result.q1.options).toEqual(['Option A', 'Option B', 'Option C']);
   });
 
-  it('maps modelAnswer from explanations', () => {
+  it('maps modelAnswer from correctAnswer', () => {
     const quizzes = [
       makeQuizDto('MULTIPLE_CHOICE', 'Q1'),
       makeQuizDto('MULTIPLE_CHOICE', 'Q2'),
-      makeQuizDto('SHORT_ANSWER', 'Q3', {
-        options: { choices: null, explanations: { modelAnswer: 'Expected answer text.' } },
-      }),
+      makeQuizDto('SHORT_ANSWER', 'Q3', { correctAnswer: 'Expected answer text.' }),
     ];
     const result = mapBackendQuizzes(quizzes);
     expect(result.q3.modelAnswer).toBe('Expected answer text.');
@@ -262,5 +260,72 @@ describe('fetchDetailWithFallback', () => {
     mockFetch.mockRejectedValue(networkErr);
     await expect(fetchDetailWithFallback('art-1', 'HARD')).rejects.toBe(networkErr);
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── mapFullArticle — MCQ correct index ────────────────────────────────────────
+
+describe('mapFullArticle MCQ correct index', () => {
+  function makeMcqDto(correctAnswer: string): QuizDto {
+    return {
+      id: 'q1',
+      type: 'MULTIPLE_CHOICE',
+      question: 'Q?',
+      options: {
+        choices: [
+          { key: 'A', text: 'Alpha', explanation: null },
+          { key: 'B', text: 'Beta', explanation: null },
+          { key: 'C', text: 'Gamma', explanation: null },
+          { key: 'D', text: 'Delta', explanation: null },
+        ],
+        explanations: null,
+      },
+      correctAnswer,
+      explanation: 'Because.',
+    };
+  }
+
+  function makeDto(q1Answer: string, q2Answer: string): ArticleDetailDto {
+    return makeDetailDto({
+      content: {
+        ...makeDetailDto().content,
+        quizzes: [
+          makeMcqDto(q1Answer),
+          makeMcqDto(q2Answer),
+          makeQuizDto('SHORT_ANSWER', 'Q3', { correctAnswer: 'model answer sentence' }),
+        ],
+      },
+    });
+  }
+
+  it('maps correctAnswer "A" to index 0', () => {
+    const article = mapFullArticle(makeDto('A', 'B'));
+    expect(article.quiz.q1.correct).toBe(0);
+  });
+
+  it('maps correctAnswer "B" to index 1', () => {
+    const article = mapFullArticle(makeDto('B', 'A'));
+    expect(article.quiz.q1.correct).toBe(1);
+  });
+
+  it('maps correctAnswer "C" to index 2', () => {
+    const article = mapFullArticle(makeDto('C', 'A'));
+    expect(article.quiz.q1.correct).toBe(2);
+  });
+
+  it('maps correctAnswer "D" to index 3', () => {
+    const article = mapFullArticle(makeDto('D', 'A'));
+    expect(article.quiz.q1.correct).toBe(3);
+  });
+
+  it('correct index is never NaN', () => {
+    const article = mapFullArticle(makeDto('B', 'C'));
+    expect(Number.isNaN(article.quiz.q1.correct)).toBe(false);
+    expect(Number.isNaN(article.quiz.q2.correct)).toBe(false);
+  });
+
+  it('maps q3 correctAnswer as modelAnswer', () => {
+    const article = mapFullArticle(makeDto('A', 'B'));
+    expect(article.quiz.q3.modelAnswer).toBe('model answer sentence');
   });
 });
