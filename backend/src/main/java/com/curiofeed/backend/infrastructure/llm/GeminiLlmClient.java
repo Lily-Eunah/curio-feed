@@ -50,35 +50,40 @@ public class GeminiLlmClient implements LlmClient {
 
     @Override
     public String generate(String prompt, Map<String, Object> schema) {
+        enforceRateLimit();
+        for (int attempt = 1; attempt <= MAX_RATE_LIMIT_RETRIES + 1; attempt++) {
+            try {
+                return doGenerate(prompt, schema);
+            } catch (RateLimitException e) {
+                if (attempt > MAX_RATE_LIMIT_RETRIES) {
+                    throw new LlmClientException(
+                            "Gemini rate limit exceeded after " + MAX_RATE_LIMIT_RETRIES + " retries (model=" + model + ")");
+                }
+                log.warn("[GeminiLlmClient] 429 received — waiting {}s before retry {}/{}  model={}",
+                        BACKOFF_MS / 1000, attempt, MAX_RATE_LIMIT_RETRIES, model);
+                sleepUninterruptibly(BACKOFF_MS);
+                enforceRateLimit();
+            }
+        }
+        throw new LlmClientException("Gemini generate unreachable");
+    }
+
+    private void enforceRateLimit() {
         try {
             CALL_LOCK.acquire();
-            long now = System.currentTimeMillis();
-            long timeSinceLastCall = now - lastCallTimeMs;
-            if (timeSinceLastCall < MIN_INTERVAL_MS) {
-                sleepUninterruptibly(MIN_INTERVAL_MS - timeSinceLastCall);
+            try {
+                long now = System.currentTimeMillis();
+                long timeSinceLastCall = now - lastCallTimeMs;
+                if (timeSinceLastCall < MIN_INTERVAL_MS) {
+                    sleepUninterruptibly(MIN_INTERVAL_MS - timeSinceLastCall);
+                }
+            } finally {
+                lastCallTimeMs = System.currentTimeMillis();
+                CALL_LOCK.release();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new LlmClientException("Interrupted while waiting for Gemini call lock", e);
-        }
-        try {
-            for (int attempt = 1; attempt <= MAX_RATE_LIMIT_RETRIES + 1; attempt++) {
-                try {
-                    return doGenerate(prompt, schema);
-                } catch (RateLimitException e) {
-                    if (attempt > MAX_RATE_LIMIT_RETRIES) {
-                        throw new LlmClientException(
-                                "Gemini rate limit exceeded after " + MAX_RATE_LIMIT_RETRIES + " retries (model=" + model + ")");
-                    }
-                    log.warn("[GeminiLlmClient] 429 received — waiting {}s before retry {}/{}  model={}",
-                            BACKOFF_MS / 1000, attempt, MAX_RATE_LIMIT_RETRIES, model);
-                    sleepUninterruptibly(BACKOFF_MS);
-                }
-            }
-            throw new LlmClientException("Gemini generate unreachable");
-        } finally {
-            lastCallTimeMs = System.currentTimeMillis();
-            CALL_LOCK.release();
         }
     }
 
