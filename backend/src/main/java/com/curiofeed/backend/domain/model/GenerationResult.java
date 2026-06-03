@@ -6,6 +6,7 @@ import java.util.List;
 
 public record GenerationResult(
         String content,
+        List<String> candidates,
         List<VocabularyData> vocabularies,
         List<QuizData> quizzes,
         SourceDigestData sourceDigest

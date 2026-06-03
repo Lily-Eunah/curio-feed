@@ -209,7 +209,7 @@ public class SubJobWorker {
         }
         List<GenerationResult.QuizData> quizzes = step3Result.quizzes();
 
-        GenerationResult finalResult = new GenerationResult(content, vocabularies, quizzes, sourceDigest);
+        GenerationResult finalResult = new GenerationResult(content, null, vocabularies, quizzes, sourceDigest);
 
         ValidationResult validation = validator.validate(finalResult);
         metrics.recordAttempt(level, validation.score());

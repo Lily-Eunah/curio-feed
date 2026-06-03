@@ -385,6 +385,21 @@ public class ThreeStepPromptBuilder {
     }
 
     /**
+     * Builds a corrective retry prompt for Step 2 when selected words overlap with recent articles.
+     * Appends a small exclusion list (only the duplicate words) to the base prompt.
+     */
+    public String buildVocabularyDeduplicationRetryPrompt(String generatedContent, DifficultyLevel level,
+                                                          List<String> excludeWords) {
+        String exclusionList = String.join(", ", excludeWords);
+        String correction = "\n⚠ CORRECTION: The following words have been used in recent articles and must NOT appear in your Phase 1 selection: "
+                + exclusionList + ". In Phase 1, choose different words from your Phase 0 candidates list that do NOT match this exclusion list.";
+        String base = buildVocabularyPrompt(generatedContent, level);
+        return base.replaceFirst(
+                "(You are an English vocabulary educator\\.)",
+                "$1" + correction);
+    }
+
+    /**
      * Builds a corrective retry prompt for Step 2.
      * @param retryReason "word_not_in_content" | other
      */

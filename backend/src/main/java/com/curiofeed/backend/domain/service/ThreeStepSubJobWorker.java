@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -347,8 +349,13 @@ public class ThreeStepSubJobWorker {
         );
     }
 
+    private static final int RECENT_VOCAB_LOOKBACK = 50; // ~10 articles × 5 words per level
+
     /**
      * Executes the VOCABULARY step with up to MAX_STEP_RETRIES attempts.
+     * After each successful generation, checks for cross-article duplicate words
+     * against the last ~10 articles at the same level. If duplicates are found
+     * and attempts remain, retries with a small exclusion list.
      *
      * @return the generated vocab list, or {@code null} if the step ultimately hard-failed.
      */
@@ -362,17 +369,25 @@ public class ThreeStepSubJobWorker {
         stepJobRepository.save(step);
 
         String lastErrors = null;
+        List<String> dedupExclusions = null; // words to exclude on dedup retry
+
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
             Instant start = Instant.now();
             try {
-                String retryReason = classifyVocabRetryReason(lastErrors);
-                String prompt = (attempt == 1)
-                        ? promptBuilder.buildVocabularyPrompt(generatedContent, level)
-                        : promptBuilder.buildVocabularyRetryPrompt(generatedContent, level, retryReason);
+                String prompt;
+                if (attempt == 1) {
+                    prompt = promptBuilder.buildVocabularyPrompt(generatedContent, level);
+                } else if (dedupExclusions != null) {
+                    prompt = promptBuilder.buildVocabularyDeduplicationRetryPrompt(generatedContent, level, dedupExclusions);
+                    dedupExclusions = null;
+                } else {
+                    String retryReason = classifyVocabRetryReason(lastErrors);
+                    prompt = promptBuilder.buildVocabularyRetryPrompt(generatedContent, level, retryReason);
+                }
 
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.vocabularySchema(), subJobId, "VOCAB");
-                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms", 
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms",
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
 
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=PARSE_START", subJobId, attempt);
@@ -395,13 +410,25 @@ public class ThreeStepSubJobWorker {
                     }
                 }
 
+                // Cross-article deduplication check
+                List<String> duplicates = findCrossArticleDuplicates(vocabs, level, articleId);
+                if (!duplicates.isEmpty()) {
+                    log.info("[subJob={} level={}] Cross-article duplicate vocab detected: {} — {}",
+                            subJobId, level, duplicates,
+                            attempt < MAX_STEP_RETRIES ? "retrying with exclusion list" : "saving best-effort");
+                    if (attempt < MAX_STEP_RETRIES) {
+                        dedupExclusions = duplicates;
+                        continue;
+                    }
+                }
+
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=SAVE_START", subJobId, attempt);
                 resultSaver.saveVocab(articleId, level, vocabs, vocabLemmatizer);
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
                 step.markCompleted(errStr != null ? "PASS_WITH_WARNINGS" : "PASS");
                 stepJobRepository.save(step);
-                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
+                log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms",
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
                 return vocabs;
 
@@ -412,6 +439,22 @@ public class ThreeStepSubJobWorker {
             }
         }
         return null;
+    }
+
+    private List<String> findCrossArticleDuplicates(List<GenerationResult.VocabularyData> vocabs,
+                                                     DifficultyLevel level, UUID currentArticleId) {
+        List<String> rawRecent = vocabularyRepository.findRecentWordsByLevel(level, currentArticleId,
+                PageRequest.of(0, RECENT_VOCAB_LOOKBACK));
+        if (rawRecent.isEmpty()) return List.of();
+
+        Set<String> recentWords = rawRecent.stream()
+                .map(w -> w.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+
+        return vocabs.stream()
+                .map(v -> v.word().toLowerCase(Locale.ROOT))
+                .filter(recentWords::contains)
+                .toList();
     }
 
     /**
