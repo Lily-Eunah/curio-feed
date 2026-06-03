@@ -8,6 +8,7 @@ out/
 .vscode/
 *.log
 .env
+**/application-local.yml
 *.class
 design/
 reference/
