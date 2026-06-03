@@ -133,14 +133,16 @@ public class ThreeStepPromptBuilder {
                     MINIMUM BAR: The word must require intentional study for an A2 learner.
                     REJECT if any of the following is true:
                       • A 10-year-old native speaker would already know this word without studying → too simple (A1/A2)
-                      • The word is the article's own topic keyword (e.g., in a biology article, reject 'survive', 'species', 'exist', 'reproduce')
+                        Examples of words to ALWAYS reject at EASY: exercise, research, progress, improve, amount, benefit, digital, request, stable, record, difficult, simple, modern, popular, important, create, develop, problem, result, process
+                      • The word is the article's own topic keyword (e.g., in a strength-training article, reject 'exercise', 'training', 'muscle'; in a tech article, reject 'chip', 'computer', 'data', 'software')
                       • The word appears so frequently across all news that it carries no distinctive learning value""";
             case MEDIUM -> """
                     MEDIUM — target B2 CEFR level words.
                     MINIMUM BAR: The word should challenge a confident B1 learner.
                     REJECT if any of the following is true:
                       • A learner who has finished a B1 course would already know and control this word comfortably → too simple
-                      • The word is a basic B1 word clearly more suited to the EASY level""";
+                      • The word is a basic B1 word clearly more suited to the EASY level
+                        Examples of words to ALWAYS reject at MEDIUM: standard, traditional, expand, analyze, apply, consider, suggest, provide, increase, various, achieve, feature, structure""";
             case HARD -> """
                     HARD — target C1 CEFR level words.
                     MINIMUM BAR: The word should require intentional vocabulary study even for a B2 learner.
@@ -151,14 +153,13 @@ public class ThreeStepPromptBuilder {
 
         return """
                 You are an English vocabulary educator.
-
-                Extract exactly 5 vocabulary words from the %s-level news article below.
+                Your task has TWO phases. Complete Phase 0 BEFORE Phase 1.
 
                 DIFFICULTY TARGET:
                 %s
 
                 ════ BASE FORM RULE — CRITICAL ════════════════════════════════════════
-                Always list the dictionary base form, never an inflected form.
+                Always use the dictionary base form, never an inflected form.
 
                   content: "targeted"    → vocab word: "target"     ✓
                   content: "targeted"    → vocab word: "targeted"   ✗ WRONG
@@ -168,13 +169,23 @@ public class ThreeStepPromptBuilder {
                   content: "depreciation"→ vocab word: "depreciate" ✓
                 ════════════════════════════════════════════════════════════════════════
 
-                EXTRACTION STEPS (follow in this exact order):
-                  A. Read every word in the content.
-                  B. Identify 5 candidates that are educationally valuable and level-appropriate.
-                  C. For each candidate, verify: does the BASE FORM or any inflected form appear in the content?
-                     If NO match found → reject this candidate, pick another.
-                  D. Apply the DIFFICULTY TARGET rules above. Reject any candidate that fails the minimum bar.
-                  E. Write the BASE FORM as the vocabulary entry.
+                ══ PHASE 0 — CANDIDATE SCAN ════════════════════════════════════════════
+                Scan EVERY word in the [CONTENT] below.
+                Write the BASE FORM of every word that satisfies ALL of the following:
+                  (a) The base form or an inflected form appears in the content.
+                  (b) The word passes the DIFFICULTY TARGET — none of the REJECT conditions apply.
+
+                Write all qualifying words in the "candidates" array.
+                Do NOT skip rare or less-common words — include every eligible word you find.
+                Aim for at least 8–15 candidates. If you find fewer than 5, slightly lower your bar.
+
+                ══ PHASE 1 — SELECTION ═════════════════════════════════════════════════
+                From your "candidates" list, choose exactly 5 words for "vocabularies".
+
+                Prefer words that:
+                  • Offer the highest learning value (learners will encounter them in other contexts)
+                  • Are specific and memorable, not vague or generic
+                  • Are NOT near-synonyms of each other (e.g., do not pick both 'incorporate' and 'integrate')
 
                 DEFINITION FORMAT — every definition MUST follow this exact pattern:
                   "[brief meaning] — used when [specific situation or condition]"
@@ -187,21 +198,20 @@ public class ThreeStepPromptBuilder {
                   • Must NOT reference the article's topic, country, or any person named in the article.
 
                 ════ SELF-CHECK before outputting ════════════════════════════════════
-                For each of your 5 words:
-                  1. Is it the BASE FORM (not inflected)?  If NO → fix it.
-                  2. Does it or an inflected form appear in the content?  If NO → replace it.
+                For each of your 5 selected words:
+                  1. Is it in the "candidates" list?  If NO → it is not allowed.
+                  2. Is it the BASE FORM (not inflected)?  If NO → fix it.
                   3. Does it pass the DIFFICULTY TARGET minimum bar?  If NO → replace it.
                   4. Does the definition end with a "used when" clause?  If NO → rewrite it.
-                  5. Does this exact word appear verbatim in the article as a common word the learner would have skipped over?
-                     If YES, and another word of equal level is available → prefer the alternative for higher learning value.
+                  5. Is another selected word a near-synonym of this one?  If YES → replace the weaker of the two.
                 ════════════════════════════════════════════════════════════════════════
 
                 Return ONLY this JSON — no other text:
-                {"vocabularies": [{"word": "...", "definition": "...", "exampleSentence": "..."}, ...]}
+                {"candidates": ["word1", "word2", ...], "vocabularies": [{"word": "...", "definition": "...", "exampleSentence": "..."}, ...]}
 
                 [CONTENT]
                 %s
-                """.formatted(level.name(), spec, generatedContent);
+                """.formatted(spec, generatedContent);
     }
 
     // ── Step 3: Quiz ──────────────────────────────────────────────────────────
@@ -366,8 +376,9 @@ public class ThreeStepPromptBuilder {
      */
     public String buildVocabularyRetryPrompt(String generatedContent, DifficultyLevel level, String retryReason) {
         String correction = switch (retryReason) {
-            case "word_not_in_content" -> "\n⚠ CORRECTION: Choose only words that appear in the generated article body " +
-                    "as base or inflected forms. Do NOT invent words absent from the text. " +
+            case "word_not_in_content" -> "\n⚠ CORRECTION: In Phase 0, list only words whose base or inflected form " +
+                    "actually appears in the content. In Phase 1, select only from the Phase 0 candidates. " +
+                    "Do NOT invent words absent from the text. " +
                     "Also ensure every word meets the DIFFICULTY TARGET minimum bar for this level.";
             default -> "";
         };
@@ -440,6 +451,11 @@ public class ThreeStepPromptBuilder {
     }
 
     public static Map<String, Object> vocabularySchema() {
+        // candidates: Phase 0 scan result — string array, declared first so Gemini generates it before vocabularies
+        Map<String, Object> candidatesArr = new LinkedHashMap<>();
+        candidatesArr.put("type", "array");
+        candidatesArr.put("items", Map.of("type", "string"));
+
         Map<String, Object> itemProps = new LinkedHashMap<>();
         itemProps.put("word", Map.of("type", "string"));
         itemProps.put("definition", Map.of("type", "string"));
@@ -458,11 +474,12 @@ public class ThreeStepPromptBuilder {
         arr.put("items", item);
 
         Map<String, Object> props = new LinkedHashMap<>();
+        props.put("candidates", candidatesArr);  // before vocabularies — order matters for chain-of-thought
         props.put("vocabularies", arr);
 
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
-        schema.put("required", List.of("vocabularies"));
+        schema.put("required", List.of("candidates", "vocabularies"));
         schema.put("properties", props);
         schema.put("additionalProperties", false);
         return schema;
