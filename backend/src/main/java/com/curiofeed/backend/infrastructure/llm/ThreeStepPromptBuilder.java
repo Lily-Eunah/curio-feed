@@ -128,9 +128,25 @@ public class ThreeStepPromptBuilder {
 
     public String buildVocabularyPrompt(String generatedContent, DifficultyLevel level) {
         String spec = switch (level) {
-            case EASY -> "EASY (A2-B1): Words a learner would encounter in B1 reading but may not fully understand. Not trivial, not too complex.";
-            case MEDIUM -> "MEDIUM (B1-B2): Academic or journalism-register vocabulary that appears naturally in news writing.";
-            case HARD -> "HARD (C1): Advanced, domain-specific vocabulary that signals sophisticated writing.";
+            case EASY -> """
+                    EASY — target B1 CEFR level words.
+                    MINIMUM BAR: The word must require intentional study for an A2 learner.
+                    REJECT if any of the following is true:
+                      • A 10-year-old native speaker would already know this word without studying → too simple (A1/A2)
+                      • The word is the article's own topic keyword (e.g., in a biology article, reject 'survive', 'species', 'exist', 'reproduce')
+                      • The word appears so frequently across all news that it carries no distinctive learning value""";
+            case MEDIUM -> """
+                    MEDIUM — target B2 CEFR level words.
+                    MINIMUM BAR: The word should challenge a confident B1 learner.
+                    REJECT if any of the following is true:
+                      • A learner who has finished a B1 course would already know and control this word comfortably → too simple
+                      • The word is a basic B1 word clearly more suited to the EASY level""";
+            case HARD -> """
+                    HARD — target C1 CEFR level words.
+                    MINIMUM BAR: The word should require intentional vocabulary study even for a B2 learner.
+                    REJECT if any of the following is true:
+                      • A B2 learner would recognize and actively use this word without difficulty → too simple
+                      • The word is a B1/B2 word more appropriate for EASY or MEDIUM level""";
         };
 
         return """
@@ -138,7 +154,8 @@ public class ThreeStepPromptBuilder {
 
                 Extract exactly 5 vocabulary words from the %s-level news article below.
 
-                DIFFICULTY TARGET: %s
+                DIFFICULTY TARGET:
+                %s
 
                 ════ BASE FORM RULE — CRITICAL ════════════════════════════════════════
                 Always list the dictionary base form, never an inflected form.
@@ -156,18 +173,8 @@ public class ThreeStepPromptBuilder {
                   B. Identify 5 candidates that are educationally valuable and level-appropriate.
                   C. For each candidate, verify: does the BASE FORM or any inflected form appear in the content?
                      If NO match found → reject this candidate, pick another.
-                  D. Write the BASE FORM as the vocabulary entry.
-                  E. Cross-check: is any of your 5 words on the FORBIDDEN LIST below?
-                     If YES → remove it immediately, pick a different word.
-
-                ════ FORBIDDEN LIST — NEVER include these words ════════════════════
-                  say, make, give, take, use, help, start, get, go, come, keep, put,
-                  show, move, run, turn, set, ask, need, want, tell, work, call, feel,
-                  look, know, think, block, connect, continue, approach, container,
-                  project, big, small, many, few, main, major, important, good, bad,
-                  thing, place, level, number, area, violation, agreement, warning,
-                  attack, change, open, close, allow, stop, hold, send, bring
-                ════════════════════════════════════════════════════════════════════════
+                  D. Apply the DIFFICULTY TARGET rules above. Reject any candidate that fails the minimum bar.
+                  E. Write the BASE FORM as the vocabulary entry.
 
                 DEFINITION FORMAT — every definition MUST follow this exact pattern:
                   "[brief meaning] — used when [specific situation or condition]"
@@ -183,8 +190,10 @@ public class ThreeStepPromptBuilder {
                 For each of your 5 words:
                   1. Is it the BASE FORM (not inflected)?  If NO → fix it.
                   2. Does it or an inflected form appear in the content?  If NO → replace it.
-                  3. Is it on the FORBIDDEN LIST?  If YES → replace it.
+                  3. Does it pass the DIFFICULTY TARGET minimum bar?  If NO → replace it.
                   4. Does the definition end with a "used when" clause?  If NO → rewrite it.
+                  5. Does this exact word appear verbatim in the article as a common word the learner would have skipped over?
+                     If YES, and another word of equal level is available → prefer the alternative for higher learning value.
                 ════════════════════════════════════════════════════════════════════════
 
                 Return ONLY this JSON — no other text:
@@ -225,10 +234,13 @@ public class ThreeStepPromptBuilder {
 
                 ════ QUIZ 2 — MULTIPLE_CHOICE — Passage Reasoning ══════════════════
                 Test cause-effect, motivation, or inference from the article.
-                The correct answer must require understanding the passage, not just finding one sentence.
 
                 ⚠ Do NOT ask about vocabulary word definitions. ⚠
                 ⚠ Do NOT ask "Which sentence uses the word X correctly?" ⚠
+                ⚠ CRITICAL: The correct answer must NOT be found in a single sentence of the article.
+                  If a learner can locate one sentence and immediately answer, it is a lookup — redesign as Q1.
+                  Q2 requires connecting information from at least two different parts of the article,
+                  OR drawing a logical conclusion that goes beyond what is explicitly stated. ⚠
 
                 GOOD question starters:
                   ✓ "Why did X happen despite Y?"
@@ -264,7 +276,9 @@ public class ThreeStepPromptBuilder {
 
                 ════ FINAL CHECKLIST ═══════════════════════════════════════════════
                   □ Q1: comprehension — main idea or central situation, not a factual lookup.
+                     → If Q1 begins with "What can be inferred", that is a Q2 pattern — redesign Q1.
                   □ Q2: reasoning — cause/effect or inference, not a vocabulary definition question.
+                     → If the correct answer appears in a single sentence of the article, Q2 is too shallow — add synthesis or inference depth.
                   □ Q3: "question" explicitly names the target vocab word and asks about the article.
                   □ Q3: "correctAnswer" is a complete sentence containing the target vocab word.
                   □ Q3: "options" is {}.
@@ -353,7 +367,8 @@ public class ThreeStepPromptBuilder {
     public String buildVocabularyRetryPrompt(String generatedContent, DifficultyLevel level, String retryReason) {
         String correction = switch (retryReason) {
             case "word_not_in_content" -> "\n⚠ CORRECTION: Choose only words that appear in the generated article body " +
-                    "as base or inflected forms. Do NOT invent words absent from the text.";
+                    "as base or inflected forms. Do NOT invent words absent from the text. " +
+                    "Also ensure every word meets the DIFFICULTY TARGET minimum bar for this level.";
             default -> "";
         };
         String base = buildVocabularyPrompt(generatedContent, level);
