@@ -61,7 +61,11 @@ public class ThreeStepPromptBuilder {
                     • Explain difficult ideas in simple words.
                     • Include about 5-6 core facts from the source.
                     • Target: 180~260 words.
-                    • Absolute hard limit: 320 words.""";
+                    • Absolute hard limit: 320 words.
+                    • Paragraph structure: Write EXACTLY 3 paragraphs.
+                      Paragraph 1 — the main event (what happened).
+                      Paragraph 2 — key details (who did what, immediate consequences).
+                      Paragraph 3 — background or broader impact.""";
             case MEDIUM -> """
                     MEDIUM (B1-B2 level):
                     • Natural news-writing style with moderate sentence variety.
@@ -69,7 +73,9 @@ public class ThreeStepPromptBuilder {
                     • Include about 6-8 core facts from the source.
                     • Preserve the main cause-effect relationships and actor motivations.
                     • Target: 220~320 words.
-                    • Absolute hard limit: 380 words.""";
+                    • Absolute hard limit: 380 words.
+                    • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
+                      key details, and context or consequences.""";
             case HARD -> """
                     HARD (C1 level):
                     • Use advanced vocabulary and varied sentence structures.
@@ -77,7 +83,9 @@ public class ThreeStepPromptBuilder {
                     • Preserve nuance, expert viewpoints, and causal chains.
                     • Include about 8-10 core facts from the source.
                     • Target: 280~420 words.
-                    • Absolute hard limit: 500 words.""";
+                    • Absolute hard limit: 500 words.
+                    • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
+                      key details, and context or consequences.""";
         };
 
         return """
@@ -107,8 +115,9 @@ public class ThreeStepPromptBuilder {
                 • Each paragraph should cover one coherent idea or stage of the story.
                 • Do not use bullet points, numbered lists, or line breaks after every sentence.
 
-                Return ONLY this JSON — no other text, no markdown:
-                {"content": "your rewritten article here"}
+                Return ONLY this JSON — no other text, no markdown.
+                Paragraphs MUST be separated by \\n\\n inside the JSON string:
+                {"content": "First paragraph text here.\\n\\nSecond paragraph text here.\\n\\nThird paragraph text here."}
 
                 [SOURCE TEXT]
                 %s
