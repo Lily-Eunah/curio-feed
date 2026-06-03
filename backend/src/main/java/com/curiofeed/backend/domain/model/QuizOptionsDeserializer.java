@@ -8,10 +8,13 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class QuizOptionsDeserializer extends StdDeserializer<QuizOptions> {
+
+    private static final String CHOICE_KEYS = "ABCD";
 
     public QuizOptionsDeserializer() {
         super(QuizOptions.class);
@@ -24,6 +27,9 @@ public class QuizOptionsDeserializer extends StdDeserializer<QuizOptions> {
         }
         List<QuizChoice> choices = null;
         Map<String, String> explanations = null;
+        // Gemini sometimes responds with {"A": "text", "B": "text", ...} instead of {"choices": [...]}
+        Map<String, String> abcdFallback = null;
+
         while (p.nextToken() != JsonToken.END_OBJECT) {
             String field = p.currentName();
             p.nextToken();
@@ -39,9 +45,27 @@ public class QuizOptionsDeserializer extends StdDeserializer<QuizOptions> {
                         explanations = ctxt.readValue(p, mapType);
                     }
                 }
-                default -> p.skipChildren();
+                default -> {
+                    // Fallback: handle {"A": "...", "B": "...", "C": "...", "D": "..."} format
+                    if (field.length() == 1 && CHOICE_KEYS.indexOf(field.charAt(0)) >= 0
+                            && p.currentToken() == JsonToken.VALUE_STRING) {
+                        if (abcdFallback == null) abcdFallback = new LinkedHashMap<>();
+                        abcdFallback.put(field, p.getText());
+                    } else {
+                        p.skipChildren();
+                    }
+                }
             }
         }
+
+        // Convert A/B/C/D map to choices list if no structured choices were found
+        if (choices == null && abcdFallback != null && !abcdFallback.isEmpty()) {
+            choices = new ArrayList<>();
+            for (Map.Entry<String, String> entry : abcdFallback.entrySet()) {
+                choices.add(new QuizChoice(entry.getKey(), entry.getValue(), null));
+            }
+        }
+
         return new QuizOptions(choices, explanations);
     }
 

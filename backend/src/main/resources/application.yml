@@ -1,6 +1,8 @@
 spring:
   application:
     name: backend
+  config:
+    import: optional:classpath:application-local.yml
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/curio_feed}
     username: ${SPRING_DATASOURCE_USERNAME:curio}
@@ -20,6 +22,8 @@ spring:
       enabled: true
 
 ai:
+  # Set to "gemini" to use Google Gemini API, or "ollama" (default) for local Ollama
+  provider: ${AI_PROVIDER:ollama}
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:gemma4:e4b}
@@ -27,6 +31,14 @@ ai:
     connect-timeout-seconds: 5
     read-timeout-seconds: 1200
     num-ctx: 16384
+    temperature: 0.3
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    # Recommended free-tier model: gemini-2.5-flash (1M context, JSON schema output)
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+    fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-2.5-flash}
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 120
     temperature: 0.3
   pipeline:
     max-retry-count: 3
