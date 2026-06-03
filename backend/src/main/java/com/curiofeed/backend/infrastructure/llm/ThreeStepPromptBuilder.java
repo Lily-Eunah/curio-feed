@@ -55,18 +55,26 @@ public class ThreeStepPromptBuilder {
 
         String spec = switch (level) {
             case EASY -> """
-                    EASY (B1 level — for learners transitioning from A2 to B1):
-                    • Write at a clear, natural B1 level. Do NOT oversimplify to only A1/A2 vocabulary —
-                      this audience is actively studying English and benefits from encountering B1 words in context.
-                    • Sentence length: 12-18 words on average. Vary length for natural flow.
-                    • Vocabulary: everyday words form the base, but B1-level words are welcome and encouraged
-                      where they fit naturally (e.g., debate, significant, consequence, reveal, generate,
-                      assess, trend, concern, attempt, influence, demonstrate, oppose, argue, establish).
-                    • Connectives: however, therefore, although, as a result, meanwhile are all appropriate.
-                    • Explain any concept beyond B1 in a brief follow-up phrase, but trust the reader
-                      to handle standard B1 vocabulary without explanation.
+                    EASY — simplified newspaper style for motivated adult learners (A2→B1 transition):
+                    Write like a real news article that has been made easier — NOT like a children's book.
+
+                    WHAT TO KEEP (do NOT simplify these):
+                    • Specific facts: exact numbers, real organization names, real places, named people.
+                      "social media ad revenue is projected to reach $317 billion" — keep the number.
+                      "Instagram and TikTok use algorithms" — keep the word 'algorithm', do not write 'smart computers'.
+                    • The natural vocabulary of the subject: words like significant, reveal, decline, strategy,
+                      consequence, debate, attempt, challenge, influence, concern, trend, recognize, respond.
+                      These are normal news words — do not replace them with simpler synonyms.
+                    • Connectives that show logic: however, therefore, although, as a result, meanwhile.
+
+                    WHAT TO SIMPLIFY:
+                    • Long complex sentences: break into two if a single sentence has more than 3 clauses.
+                    • Technical jargon beyond B1: briefly clarify in a parenthetical or follow-up phrase.
+                    • Idiomatic or culture-specific expressions that a non-native reader would not recognize.
+
+                    • Mix shorter sentences (8-12 words) with medium ones (14-20 words) for natural rhythm.
                     • Include about 5-6 core facts from the source.
-                    • Target: 180~260 words.
+                    • Target: 200~280 words.
                     • Absolute hard limit: 320 words.
                     • Paragraph structure: Write EXACTLY 3 paragraphs.
                       Paragraph 1 — the main event (what happened).
@@ -95,7 +103,7 @@ public class ThreeStepPromptBuilder {
         };
 
         return """
-                You are an expert English content adapter for language learners.
+                You are a journalist writing calibrated news articles for English learners at different proficiency levels.
 
                 %s
 
