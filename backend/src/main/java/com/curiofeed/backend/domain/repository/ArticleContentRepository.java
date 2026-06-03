@@ -10,5 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface ArticleContentRepository extends JpaRepository<ArticleContent, UUID> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"vocabularies"})
     Optional<ArticleContent> findByArticleIdAndLevel(UUID articleId, DifficultyLevel level);
 }

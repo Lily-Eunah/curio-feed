@@ -107,7 +107,11 @@ public class GeminiLlmClient implements LlmClient {
                     .body(request)
                     .retrieve()
                     .onStatus(status -> status.value() == 429,
-                            (req, res) -> { throw new RateLimitException("HTTP 429"); })
+                            (req, res) -> { 
+                                String body = new String(res.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                                log.warn("[GeminiLlmClient] HTTP 429 response body: {}", body);
+                                throw new RateLimitException("HTTP 429: " + body); 
+                            })
                     .onStatus(status -> status.isError(),
                             (req, res) -> { throw new LlmClientException("Gemini call failed: HTTP " + res.getStatusCode()); })
                     .body(GeminiResponse.class);
