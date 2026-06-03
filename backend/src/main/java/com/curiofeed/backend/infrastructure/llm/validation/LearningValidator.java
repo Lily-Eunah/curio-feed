@@ -80,9 +80,10 @@ public class LearningValidator {
     }
 
     private void checkShortAnswer(QuizData quiz, int index, List<String> errors) {
+        // Q3 correctAnswer is now a model-answer sentence (expected 10-40 words), not a single vocab word
         int wordCount = quiz.correctAnswer().trim().split("\\s+").length;
-        if (wordCount > 5) {
-            errors.add("[SOFT] quiz[" + index + "] SHORT_ANSWER correctAnswer too long: " + wordCount + " words");
+        if (wordCount > 60) {
+            errors.add("[SOFT] quiz[" + index + "] SHORT_ANSWER correctAnswer unexpectedly long: " + wordCount + " words");
         }
     }
 

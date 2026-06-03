@@ -24,43 +24,59 @@ class QuizStepValidatorTest {
     private static List<VocabularyData> vocabs() {
         return List.of(
                 new VocabularyData("surge", "sharp rise — used when prices increase rapidly", "ex"),
-                new VocabularyData("blockade", "to block — used when access is cut off", "ex"),
+                new VocabularyData("optimistic", "hopeful — used when expecting a good outcome", "ex"),
                 new VocabularyData("target", "to aim at — used when attacking a specific entity", "ex"),
                 new VocabularyData("restrict", "to limit — used when movement is constrained", "ex"),
                 new VocabularyData("escalate", "to worsen — used when conflict intensifies", "ex")
         );
     }
 
-    private static QuizData mcq(String question, String vocabWord) {
+    private static QuizData comprehensionMcq(String question) {
         QuizOptions opts = new QuizOptions(List.of(
-                new QuizChoice("A", "The price began to " + vocabWord + " when demand rose.", "correct"),
-                new QuizChoice("B", "He tried to " + vocabWord + " the meeting to Thursday.", "wrong"),
-                new QuizChoice("C", "She decided to " + vocabWord + " her lunch order.", "wrong"),
-                new QuizChoice("D", "They refused to " + vocabWord + " the situation.", "wrong")
+                new QuizChoice("A", "Hotels expected a large surge in visitors.", "correct"),
+                new QuizChoice("B", "Bookings were extremely high.", "wrong"),
+                new QuizChoice("C", "The event was cancelled.", "wrong"),
+                new QuizChoice("D", "Prices dropped significantly.", "wrong")
         ), null);
         return new QuizData(QuizType.MULTIPLE_CHOICE, question, opts, "A", "explanation");
     }
 
-    private static QuizData shortAnswer(String question, String answer) {
-        return new QuizData(QuizType.SHORT_ANSWER, question, new QuizOptions(null, null), answer, "explanation");
+    private static QuizData reasoningMcq(String question) {
+        QuizOptions opts = new QuizOptions(List.of(
+                new QuizChoice("A", "Hotels remained optimistic because they expected a late surge in bookings.", "correct"),
+                new QuizChoice("B", "They reduced prices to attract more guests.", "wrong"),
+                new QuizChoice("C", "The government guaranteed full occupancy.", "wrong"),
+                new QuizChoice("D", "Most travellers booked months in advance.", "wrong")
+        ), null);
+        return new QuizData(QuizType.MULTIPLE_CHOICE, question, opts, "A", "explanation");
     }
+
+    private static QuizData passageGroundedShortAnswer(String question, String modelAnswer) {
+        return new QuizData(QuizType.SHORT_ANSWER, question, new QuizOptions(null, null), modelAnswer, "Target word: optimistic");
+    }
+
+    // ── Happy path ───────────────────────────────────────────────────────────────
 
     @Test
     void validQuizSet_noHardFails() {
         List<QuizData> quizzes = List.of(
-                mcq("Why did oil prices rise sharply after the closure?", "surge"),
-                mcq("Which sentence uses the word 'surge' correctly in a cooking context?", "surge"),
-                shortAnswer("The athlete's performance began to ___ when training increased.", "surge")
+                comprehensionMcq("What best summarizes the main concern described in the article?"),
+                reasoningMcq("Why did hotel owners remain optimistic despite weak early bookings?"),
+                passageGroundedShortAnswer(
+                        "In one sentence, explain why hotel owners stayed hopeful despite weak early bookings. Use the word 'optimistic' in your answer.",
+                        "Hotel owners remained optimistic because they believed a late surge in World Cup visitors would fill their rooms.")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
         assertThat(validator.isHardFail(errors)).isFalse();
     }
 
+    // ── Hard fails ────────────────────────────────────────────────────────────────
+
     @Test
     void wrongQuizCount_hardFail() {
         List<QuizData> quizzes = List.of(
-                mcq("Why did prices rise?", "surge"),
-                mcq("Which uses surge correctly?", "surge")
+                comprehensionMcq("What is the main concern?"),
+                reasoningMcq("Why did bookings stay low?")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
         assertThat(validator.isHardFail(errors)).isTrue();
@@ -70,9 +86,9 @@ class QuizStepValidatorTest {
     @Test
     void q1IsShortAnswer_hardFail() {
         List<QuizData> quizzes = List.of(
-                shortAnswer("What caused the prices to rise?", "surge"),
-                mcq("Which uses surge correctly?", "surge"),
-                shortAnswer("Fill: The price began to ___ sharply.", "surge")
+                passageGroundedShortAnswer("What caused the prices to rise?", "Prices surged due to high demand."),
+                reasoningMcq("Why did hotel owners stay optimistic?"),
+                passageGroundedShortAnswer("Explain using 'optimistic'.", "They remained optimistic about the future.")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
         assertThat(validator.isHardFail(errors)).isTrue();
@@ -82,9 +98,9 @@ class QuizStepValidatorTest {
     @Test
     void q3IsMultipleChoice_hardFail() {
         List<QuizData> quizzes = List.of(
-                mcq("Why did prices rise?", "surge"),
-                mcq("Which uses surge correctly?", "surge"),
-                mcq("What sentence uses blockade correctly?", "blockade") // wrong type for Q3
+                comprehensionMcq("What best summarizes the article?"),
+                reasoningMcq("Why did bookings remain weak?"),
+                comprehensionMcq("What sentence best describes the main situation?")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
         assertThat(validator.isHardFail(errors)).isTrue();
@@ -92,23 +108,51 @@ class QuizStepValidatorTest {
     }
 
     @Test
-    void q3AnswerNotInVocab_softWarn() {
+    void mcqBlankCorrectAnswer_hardFail() {
+        QuizOptions opts = new QuizOptions(List.of(
+                new QuizChoice("A", "Text A", "expl"),
+                new QuizChoice("B", "Text B", "expl"),
+                new QuizChoice("C", "Text C", "expl"),
+                new QuizChoice("D", "Text D", "expl")
+        ), null);
+        QuizData q1 = new QuizData(QuizType.MULTIPLE_CHOICE, "Q?", opts, "", "exp");
         List<QuizData> quizzes = List.of(
-                mcq("Why did prices rise?", "surge"),
-                mcq("Which uses surge correctly?", "surge"),
-                shortAnswer("Fill: The price began to ___ sharply.", "blend") // not in vocab
+                q1,
+                reasoningMcq("Why did bookings stay low?"),
+                passageGroundedShortAnswer("Use 'optimistic'.", "They remained optimistic.")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
-        assertThat(validator.isHardFail(errors)).isFalse();
-        assertThat(errors).anyMatch(e -> e.startsWith("[SOFT]") && e.contains("not found in vocab list"));
+        assertThat(validator.isHardFail(errors)).isTrue();
+        assertThat(errors).anyMatch(e -> e.contains("quiz[0].correctAnswer is blank"));
     }
+
+    @Test
+    void mcqCorrectAnswerNotABCD_hardFail() {
+        QuizOptions opts = new QuizOptions(List.of(
+                new QuizChoice("A", "Text A", "expl"),
+                new QuizChoice("B", "Text B", "expl"),
+                new QuizChoice("C", "Text C", "expl"),
+                new QuizChoice("D", "Text D", "expl")
+        ), null);
+        QuizData q1 = new QuizData(QuizType.MULTIPLE_CHOICE, "Q?", opts, "E", "exp");
+        List<QuizData> quizzes = List.of(
+                q1,
+                reasoningMcq("Why did bookings stay low?"),
+                passageGroundedShortAnswer("Use 'optimistic'.", "They remained optimistic.")
+        );
+        List<String> errors = validator.validate(quizzes, vocabs());
+        assertThat(validator.isHardFail(errors)).isTrue();
+        assertThat(errors).anyMatch(e -> e.contains("correctAnswer 'E' is not A/B/C/D"));
+    }
+
+    // ── Soft warnings ─────────────────────────────────────────────────────────────
 
     @Test
     void shallowQ1_softWarn() {
         List<QuizData> quizzes = List.of(
-                mcq("What percentage of oil passes through the strait?", "surge"), // shallow
-                mcq("Which uses surge correctly?", "surge"),
-                shortAnswer("The price began to ___.", "surge")
+                comprehensionMcq("What percentage of hotels reported losses?"),
+                reasoningMcq("Why did hotel owners remain optimistic?"),
+                passageGroundedShortAnswer("Use 'optimistic'.", "They remained optimistic about future bookings.")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
         assertThat(validator.isHardFail(errors)).isFalse();
@@ -116,23 +160,56 @@ class QuizStepValidatorTest {
     }
 
     @Test
-    void q2WithVocabInChoices_passes() {
-        // Verify Q2 uses a vocab word in choices
-        QuizOptions opts = new QuizOptions(List.of(
-                new QuizChoice("A", "The price began to surge when demand rose.", "correct"),
-                new QuizChoice("B", "He tried to surge the meeting.", "wrong"),
-                new QuizChoice("C", "She surged her lunch order.", "wrong"),
-                new QuizChoice("D", "They surged the situation.", "wrong")
-        ), null);
-        QuizData q2 = new QuizData(QuizType.MULTIPLE_CHOICE,
-                "Which sentence uses 'surge' correctly in a school context?", opts, "A", "expl");
-
+    void q2VocabDefinitionQuestion_softWarn() {
         List<QuizData> quizzes = List.of(
-                mcq("Why did prices rise?", "surge"),
-                q2,
-                shortAnswer("The economy began to ___.", "surge")
+                comprehensionMcq("What best summarizes the article?"),
+                reasoningMcq("Which sentence uses the word 'surge' correctly in a school context?"),
+                passageGroundedShortAnswer("Use 'optimistic'.", "They remained optimistic.")
         );
         List<String> errors = validator.validate(quizzes, vocabs());
-        assertThat(errors).noneMatch(e -> e.contains("Q2") && e.contains("vocab word"));
+        assertThat(validator.isHardFail(errors)).isFalse();
+        assertThat(errors).anyMatch(e -> e.startsWith("[SOFT]") && e.contains("vocabulary-definition question"));
+    }
+
+    @Test
+    void q3ModelAnswerMissingVocab_softWarn() {
+        List<QuizData> quizzes = List.of(
+                comprehensionMcq("What best summarizes the article?"),
+                reasoningMcq("Why did bookings stay low?"),
+                passageGroundedShortAnswer(
+                        "In one sentence, explain why hotel owners stayed hopeful. Use the word 'optimistic' in your answer.",
+                        "Hotel owners stayed hopeful because they believed more visitors would arrive later.")
+        );
+        List<String> errors = validator.validate(quizzes, vocabs());
+        assertThat(validator.isHardFail(errors)).isFalse();
+        assertThat(errors).anyMatch(e -> e.startsWith("[SOFT]") && e.contains("does not contain any vocab word"));
+    }
+
+    @Test
+    void q3QuestionMissingVocabWord_softWarn() {
+        List<QuizData> quizzes = List.of(
+                comprehensionMcq("What best summarizes the article?"),
+                reasoningMcq("Why did bookings stay low?"),
+                passageGroundedShortAnswer(
+                        "In one sentence, explain why hotel owners stayed hopeful despite weak early bookings.",
+                        "Hotel owners remained optimistic because a late surge in tourists was expected.")
+        );
+        List<String> errors = validator.validate(quizzes, vocabs());
+        assertThat(validator.isHardFail(errors)).isFalse();
+        assertThat(errors).anyMatch(e -> e.startsWith("[SOFT]") && e.contains("does not mention a vocab word"));
+    }
+
+    @Test
+    void validPassageGroundedQ3_noVocabWarnings() {
+        List<QuizData> quizzes = List.of(
+                comprehensionMcq("What best summarizes the main concern?"),
+                reasoningMcq("Why did hotel owners remain hopeful?"),
+                passageGroundedShortAnswer(
+                        "In one sentence, explain why hotel owners stayed hopeful despite weak early bookings. Use the word 'optimistic' in your answer.",
+                        "Hotel owners remained optimistic because they believed a late surge in World Cup visitors would fill their rooms.")
+        );
+        List<String> errors = validator.validate(quizzes, vocabs());
+        assertThat(errors).noneMatch(e -> e.contains("does not contain any vocab word"));
+        assertThat(errors).noneMatch(e -> e.contains("does not mention a vocab word"));
     }
 }

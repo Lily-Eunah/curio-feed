@@ -194,63 +194,73 @@ public class ThreeStepPromptBuilder {
 
                 INPUT:
                   (A) A news article — [CONTENT] below
-                  (B) 5 vocabulary words from that article — [VOCABULARY] below
+                  (B) 5 vocabulary words extracted from that article — [VOCABULARY] below
 
-                Design EXACTLY 3 quizzes.
+                Design EXACTLY 3 quizzes that test reading comprehension and vocabulary in context.
 
-                ════ QUIZ 1 — MULTIPLE_CHOICE — Comprehension / Reasoning ═════════
-                Test a cause-effect relationship or inference from the article.
-                The correct answer must require understanding the passage, not just finding one sentence.
+                ════ QUIZ 1 — MULTIPLE_CHOICE — Passage Comprehension ══════════════
+                Test whether the learner understood the article's central point or main situation.
 
-                BANNED question starters:
-                  ✗ "What percentage..." ✗ "How many..." ✗ "Which country..."
-                  ✗ "When did..." ✗ Any question about a specific number or date
+                BANNED question types:
+                  ✗ Any question about a specific number, percentage, date, or country name
+                  ✗ Copying a single sentence from the article and asking who/what/when
 
                 GOOD question starters:
-                  ✓ "Why did X lead to Y?" ✓ "What does the author imply about...?"
-                  ✓ "What would most likely happen if...?" ✓ "What is the underlying reason for...?"
+                  ✓ "What best summarizes the main concern described in the article?"
+                  ✓ "Which statement best reflects the article's central point?"
+                  ✓ "What is the overall situation described in the article?"
+                  ✓ "According to the article, what is the main challenge facing...?"
+
+                4 choices (A/B/C/D). ONE correct. Wrong choices are plausible but contradict the passage.
+                Each choice: non-empty explanation. "correctAnswer": exactly "A", "B", "C", or "D".
+
+                ════ QUIZ 2 — MULTIPLE_CHOICE — Passage Reasoning ══════════════════
+                Test cause-effect, motivation, or inference from the article.
+                The correct answer must require understanding the passage, not just finding one sentence.
+
+                ⚠ Do NOT ask about vocabulary word definitions. ⚠
+                ⚠ Do NOT ask "Which sentence uses the word X correctly?" ⚠
+
+                GOOD question starters:
+                  ✓ "Why did X happen despite Y?"
+                  ✓ "What can be inferred from the fact that...?"
+                  ✓ "What does the author imply about...?"
+                  ✓ "What is the most likely reason that...?"
+                  ✓ "What would most likely happen if...?"
 
                 4 choices (A/B/C/D). ONE correct. Wrong choices are plausible misconceptions.
                 Each choice: non-empty explanation. "correctAnswer": exactly "A", "B", "C", or "D".
 
-                ════ QUIZ 2 — MULTIPLE_CHOICE — Vocabulary Application ═══════════
-                ⚠ THIS IS NOT A COMPREHENSION QUESTION. ⚠
-                ⚠ Do NOT ask about the article content. ⚠
-                ⚠ Do NOT ask "What does the passage suggest..." ⚠
-
-                This quiz tests whether a learner can USE a vocabulary word correctly.
+                ════ QUIZ 3 — SHORT_ANSWER — Passage-Grounded Vocabulary Application ════
+                ⚠ This tests both reading comprehension AND vocabulary in context. ⚠
+                ⚠ Do NOT write a fill-in-the-blank sentence unrelated to the article. ⚠
+                ⚠ Do NOT ask "Which vocabulary word fits the blank?" ⚠
 
                 MANDATORY STEPS — follow exactly:
-                  STEP A: From [VOCABULARY] below, pick one word. Call it WORD_X.
-                  STEP B: Write a brief everyday scenario completely unrelated to the article
-                           (school, cooking, sports, travel, workplace, relationships).
-                  STEP C: The question asks which sentence uses WORD_X correctly in that scenario.
-                  STEP D: Write exactly 4 answer choices — each MUST contain WORD_X:
-                           A → WORD_X used CORRECTLY in the scenario   ← this is the correct answer
-                           B → WORD_X used with wrong meaning
-                           C → WORD_X used in wrong context
-                           D → WORD_X used with opposite meaning
-                  STEP E: Set "correctAnswer" to the letter of the correct choice.
+                  STEP A: List your 5 vocabulary words from [VOCABULARY].
+                  STEP B: Pick ONE word from the list. Call it TARGET_WORD.
+                  STEP C: Write a question that asks the learner to explain something from the article
+                           in their own words — and explicitly requires them to use TARGET_WORD.
+                           Format: "In one sentence, [article-based task]. Use the word '[TARGET_WORD]' in your answer."
+                  STEP D: Set "correctAnswer" to a complete model answer sentence that:
+                           • answers the article-based task
+                           • contains TARGET_WORD (or an inflected form)
+                  STEP E: Set "explanation" to: "Target word: TARGET_WORD"
+                  STEP F: "options" MUST be exactly: {}
 
-                ════ QUIZ 3 — SHORT_ANSWER — Fill-in-the-blank ════════════════════
-                ⚠ MANDATORY: The answer MUST be one of the 5 words from [VOCABULARY]. ⚠
-
-                STEPS:
-                  STEP A: Write out your 5 vocabulary words:
-                          Vocab word 1: [word]  ...  Vocab word 5: [word]
-                  STEP B: Pick ONE of those 5 words as the answer. Call it ANSWER_WORD.
-                  STEP C: Write an everyday sentence (NOT the article topic) with one blank.
-                          The sentence should make ANSWER_WORD the natural fit for the blank.
-                  STEP D: Set "correctAnswer" to exactly ANSWER_WORD.
-                  STEP E: "options" MUST be exactly: {}
-
-                BANNED answers: any word NOT in [VOCABULARY].
+                BANNED for Q3:
+                  ✗ Fill-in-the-blank sentences unrelated to the article
+                  ✗ "Use the word in any sentence" (must be grounded in article content)
+                  ✗ correctAnswer that does not contain TARGET_WORD or its inflected form
 
                 ════ FINAL CHECKLIST ═══════════════════════════════════════════════
-                  □ Q1: requires reasoning, not factual lookup.
-                  □ Q2: NOT about the article. All 4 choices contain WORD_X. WORD_X is in [VOCABULARY].
-                  □ Q3: "correctAnswer" is EXACTLY one of the 5 words in [VOCABULARY]; "options" is {}.
-                  □ All MCQs: exactly 4 choices, each with non-empty key, text, explanation.
+                  □ Q1: comprehension — main idea or central situation, not a factual lookup.
+                  □ Q2: reasoning — cause/effect or inference, not a vocabulary definition question.
+                  □ Q3: "question" explicitly names the target vocab word and asks about the article.
+                  □ Q3: "correctAnswer" is a complete sentence containing the target vocab word.
+                  □ Q3: "options" is {}.
+                  □ All MCQs: exactly 4 choices (A/B/C/D), each with non-empty text and explanation.
+                  □ All MCQs: "correctAnswer" is exactly "A", "B", "C", or "D".
                   □ Total: exactly 3 quiz objects.
 
                 [VOCABULARY]
@@ -275,10 +285,10 @@ public class ThreeStepPromptBuilder {
                     },
                     {
                       "type": "SHORT_ANSWER",
-                      "question": "...",
+                      "question": "In one sentence, [article-based task]. Use the word '[TARGET_WORD]' in your answer.",
                       "options": {},
-                      "correctAnswer": "...",
-                      "explanation": "..."
+                      "correctAnswer": "A complete model answer sentence containing [TARGET_WORD].",
+                      "explanation": "Target word: [TARGET_WORD]"
                     }
                   ]
                 }
@@ -350,12 +360,19 @@ public class ThreeStepPromptBuilder {
     public String buildQuizRetryPrompt(String generatedContent, String vocabJson,
                                        DifficultyLevel level, String retryReason) {
         String correction = switch (retryReason) {
-            case "q2_not_vocab_application" ->
-                    "\n⚠ CORRECTION: Regenerate Q2 as a vocabulary application question in a new everyday context. " +
-                    "Do NOT ask about the article content. All 4 choices must contain the chosen vocabulary word.";
-            case "q3_answer_not_in_vocab" ->
-                    "\n⚠ CORRECTION: Regenerate Q3 so the correct answer is exactly one of the 5 vocabulary words " +
-                    "listed in [VOCABULARY]. The fill-in-the-blank sentence must make that word the natural fit.";
+            case "q1_shallow" ->
+                    "\n⚠ CORRECTION: Regenerate Q1 as a passage comprehension question about the article's main " +
+                    "idea or central situation. Do NOT ask about specific numbers, dates, or named countries.";
+            case "q2_not_reasoning" ->
+                    "\n⚠ CORRECTION: Regenerate Q2 as a passage reasoning question (cause/effect or inference). " +
+                    "Do NOT ask about vocabulary word meanings or usage.";
+            case "q3_not_passage_grounded" ->
+                    "\n⚠ CORRECTION: Regenerate Q3 so the question asks about the article content and explicitly " +
+                    "requires the learner to use a vocabulary word from [VOCABULARY] in their answer. " +
+                    "The correctAnswer must be a complete sentence containing that vocabulary word.";
+            case "q3_answer_missing_vocab" ->
+                    "\n⚠ CORRECTION: Regenerate Q3 so the correctAnswer is a complete sentence that contains " +
+                    "the target vocabulary word named in the question.";
             default -> "";
         };
         String base = buildQuizPrompt(generatedContent, vocabJson, level);
