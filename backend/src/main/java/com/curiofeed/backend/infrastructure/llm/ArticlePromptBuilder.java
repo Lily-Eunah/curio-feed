@@ -6,184 +6,171 @@ import org.springframework.stereotype.Component;
 @Component
 public class ArticlePromptBuilder {
 
-    private static final String TEMPLATE = """
-            You are an English learning content creator.
+    private static final String SOURCE_DIGEST_TEMPLATE = """
+            You are a professional editor.
+            Summarize the core facts of the following article in a structured format.
+            Extract the central story and core facts without adding or interpreting information.
+            Ensure sufficient factual density for a 260~420 word summary.
+            Do not use a narrative format.
 
-            Rewrite the article below for a {LEVEL} level English learner and generate vocabulary and quizzes.
-
-            ---
-
-            [LEVEL]
-
-            - EASY: A2-B1. Use only high-frequency everyday words. Short, clear sentences. Avoid technical or rare vocabulary.
-              Prefer the most common spoken words over formal or academic alternatives.
-              If a simpler synonym exists, always use the simpler word.
-            - MEDIUM: B1-B2. Moderate vocabulary and sentence variety. Topic-specific words are acceptable.
-            - HARD: C1. Advanced, precise vocabulary. Complex and varied sentence structures.
-
-            The rewritten content must preserve the key information and logical flow of the original article.
-            Do NOT over-summarize — ensure all major points from the original are present.
-
-            ---
-
-            [PARAGRAPH FORMAT]
-
-            - Write the article in 3 to 4 natural paragraphs.
-            - Do not return one large block of text.
-            - Separate paragraphs with a blank line.
-            - Each paragraph should cover one coherent idea or stage of the story.
-            - Do not use bullet points, numbered lists, or line breaks after every sentence.
-
-            ---
-
-            [VOCABULARY RULES]
-
-            - Include EXACTLY 5 items
-            - Vocabulary difficulty MUST strictly match the {LEVEL} level
-            - Vocabulary words must be important for understanding the main idea of the content — avoid trivial or overly generic words
-            - Use the BASE FORM of the word (e.g., "deteriorate" not "deteriorating", "negotiate" not "negotiations")
-            - Each vocabulary word must appear in the content (base form preferred; inflected forms are acceptable if natural)
-            - Do NOT include multiple forms of the same root word (e.g., not both "negotiate" and "negotiation")
-            - Definition must be learner-friendly and include a simple usage context — avoid synonyms only
-              Help the learner understand WHEN and HOW to use the word, not just what it means
-              ✅ "used when something makes it hard to move forward or complete a task"
-            - exampleSentence must reflect a natural, everyday situation unrelated to the article
-              ✅ "She had a concern about her son's health after he started coughing"
-
-            Format:
+            Output strictly in this JSON format:
             {
-              "word": string,
-              "definition": string,
-              "exampleSentence": string
+              "sourceDigest": {
+                "centralStory": "1-2 sentence summary of the core event",
+                "coreFacts": ["fact 1", "fact 2", ...],
+                "supportingDetails": ["detail 1", "detail 2", ...],
+                "omittedDetails": ["list of omitted elements"]
+              }
             }
-
-            ---
-
-            [QUIZ RULES]
-
-            Include EXACTLY 3 quizzes. Use different cognitive skills across quizzes — avoid repeating the same question pattern:
-
-            1. MULTIPLE_CHOICE (Comprehension)
-               - Test understanding of a key idea in the article
-               - Require inference, cause-effect reasoning, or scenario-based thinking — not just copying a sentence
-
-            2. MULTIPLE_CHOICE (Vocabulary Application)
-               - MUST test one of the vocabulary words from the list above
-               - The tested vocabulary word must NOT appear in the question
-               - The vocabulary word should appear in choices where grammatically natural; grammar must be prioritized over forced insertion
-               - At least TWO choices must use the vocabulary word; incorrect choices must reflect realistic misuse (wrong collocation, wrong context)
-               - Only ONE choice must be clearly correct in meaning and usage
-               - Test real context understanding — avoid simple synonym matching
-
-            3. SHORT_ANSWER (Recall)
-               - MUST require applying or understanding one of the vocabulary words in a new or inferred context
-               - Must NOT simply recall a fact from the article
-               - The answer must NOT be directly found as a phrase in the content
-               - Preferred format: fill-in-the-blank with a vocabulary word
-               - Must NOT overlap with other questions
-               - Must NOT test factual recall of numbers or proper nouns
-               - For EASY: the answer may be a simple phrase using a vocabulary word
-               - For HARD: the answer should require deeper understanding and abstraction
-
-            At least ONE quiz MUST use one of the vocabulary words in a new context.
-
-            ---
-
-            [MULTIPLE_CHOICE RULES]
-
-            - 4 choices (A, B, C, D)
-            - Only ONE correct answer
-            - Wrong choices must be semantically similar or represent common misconceptions — NEVER absurd or off-topic
-            - Use a mix of distractor types: incorrect usage, opposite meaning, or partial misunderstanding
-            - Do NOT reuse full sentences or phrases from the content in any quiz question or choice
-            - Each choice MUST have an "explanation" (why it is correct or why it is wrong)
-            - "correctAnswer" must be exactly one of: "A", "B", "C", or "D"
-            - The correct answer word or phrase must NOT appear in the question itself
-
-            ---
-
-            [SHORT_ANSWER RULES]
-
-            - Answer must be concise: 1–5 words, short phrase only, NOT a full sentence
-            - Must test English vocabulary or comprehension, NOT factual recall of numbers or proper nouns
-            - The answer must require understanding of meaning, not copying
-
-            ---
-
-            [OUTPUT FORMAT]
-
-            Return ONLY valid JSON.
-
-            {
-              "content": string,
-              "vocabularies": [
-                {
-                  "word": string,
-                  "definition": string,
-                  "exampleSentence": string
-                }
-              ],
-              "quizzes": [
-                {
-                  "type": "MULTIPLE_CHOICE",
-                  "question": string,
-                  "options": {
-                    "choices": [
-                      {"key": "A", "text": string, "explanation": string},
-                      {"key": "B", "text": string, "explanation": string},
-                      {"key": "C", "text": string, "explanation": string},
-                      {"key": "D", "text": string, "explanation": string}
-                    ]
-                  },
-                  "correctAnswer": "A",
-                  "explanation": string
-                },
-                {
-                  "type": "SHORT_ANSWER",
-                  "question": string,
-                  "options": {},
-                  "correctAnswer": string,
-                  "explanation": string
-                }
-              ]
-            }
-
-            ---
-
-            [SELF-CHECK]
-
-            Before returning, verify in this order:
-
-            1. vocab = 5, quiz = 3, types = 2 MCQ + 1 SHORT
-            2. All vocab words appear in the content
-            3. Vocabulary words themselves are in base form (inflected forms may appear in the content)
-            4. No duplicate root words in vocabulary list
-            5. Vocabulary words are important to the main idea — not trivial or generic
-            6. Vocabulary difficulty matches {LEVEL}; EASY uses only high-frequency spoken words
-            7. All definitions explain WHEN/HOW to use the word, not just synonyms
-            8. All exampleSentences use everyday situations unrelated to the article
-            9. Vocabulary Application MCQ: at least 2 choices use the tested word; tested word not in question; only 1 choice is clearly correct
-            10. SHORT_ANSWER requires applying vocabulary in a new context; answer not directly found in content
-            11. No quiz question or choice reuses full sentences or phrases from the content
-            12. MCQ wrong choices are plausible — not absurd or obviously wrong
-            13. SHORT_ANSWER answer is a short phrase (1–5 words), not a full sentence
-            14. SHORT_ANSWER does not test a number or proper noun
-            15. Each MCQ choice has a non-empty "explanation"
-            16. correctAnswer is a single letter: "A", "B", "C", or "D"
-            17. JSON is valid and all fields are present
-
-            If any condition fails, revise the ENTIRE output to fix all issues before returning.
-            Do NOT partially fix — ensure the final output fully satisfies ALL rules.
-
-            ---
 
             [ARTICLE]
             {ORIGINAL_CONTENT}
             """;
 
-    public String build(String originalContent, DifficultyLevel level) {
-        return TEMPLATE
+    private static final String CONTENT_TEMPLATE = """
+            You are an English learning content creator.
+            Rewrite the given source text for a {LEVEL} level English learner.
+
+            [LEVEL REQUIREMENTS]
+            - EASY (A2-B1): 12~15 words per sentence. 10yo native level vocab. 5~6 core facts. 180~260 words (max 320). Exactly 3 paragraphs (event/details/background).
+            - MEDIUM (B1-B2): Varied sentence lengths. News journalism vocab. 6~8 core facts. 220~320 words (max 380). 3~4 paragraphs.
+            - HARD (C1): Complex structure. Advanced/professional vocab. 8~10 core facts. 280~420 words (max 500). 3~4 paragraphs.
+
+            [CONSTRAINTS]
+            - Do not add information not present in the source.
+            - Use natural prose only. Do not use bullets, headers, or lists.
+            - Separate paragraphs with exactly \\n\\n. (Ensure it is escaped in JSON)
+            - Word count limits are strictly prioritized over content preservation.
+
+            Output strictly in this JSON format:
+            {
+              "content": "paragraph 1\\n\\nparagraph 2\\n\\nparagraph 3"
+            }
+
+            [SOURCE TEXT]
+            {SOURCE_TEXT}
+            """;
+
+    private static final String VOCABULARY_TEMPLATE = """
+            You are an English learning content creator.
+            Extract exactly 5 vocabulary words from the article provided below.
+
+            [RULES]
+            1. BASE FORM RULE (CRITICAL):
+               - Submit the dictionary base form (e.g., 'targeted' -> 'target', 'restricting' -> 'restrict').
+               - The word or its inflected form MUST appear in the article text.
+            2. FORBIDDEN LIST: Do not use A1 level, overly simple words, or generic news words that appear everywhere.
+            3. DEFINITION FORMAT: "[short meaning] — used when [specific situation or condition]"
+               Example: "to prevent access to an area — used when a military power wants to cut off a region"
+            4. EXAMPLE SENTENCE: Use a completely different context from the article (e.g., cooking, sports, school, shopping). Do NOT reuse article content.
+
+            Output strictly in this JSON format:
+            {
+              "vocabularies": [
+                {
+                  "word": "base_form_word",
+                  "definition": "...",
+                  "exampleSentence": "..."
+                }
+              ]
+            }
+
+            [ARTICLE CONTENT]
+            {CONTENT}
+            """;
+
+    private static final String QUIZ_TEMPLATE = """
+            You are an English learning content creator.
+            Create exactly 3 quizzes based on the article and vocabulary provided below.
+
+            [QUIZ RULES]
+            Q1 - MULTIPLE_CHOICE (Passage Comprehension):
+            - Test core theme or overall situation.
+            - Do NOT ask about specific numbers, percentages, dates, or country names.
+            - Do NOT copy sentences to ask who/what/when.
+            - Format: 4 choices, 1 correct answer, plausible distractors.
+
+            Q2 - MULTIPLE_CHOICE (Passage Reasoning):
+            - Test cause/effect, motivation, or implications.
+            - Do NOT ask vocabulary definitions or "Which sentence uses X correctly?".
+            - Format: 4 choices, requires full passage understanding.
+
+            Q3 - SHORT_ANSWER (Vocabulary in Context):
+            - Test article comprehension AND vocabulary usage simultaneously.
+            - Process:
+              1. Choose 1 word from the vocabulary list as TARGET_WORD.
+              2. Ask a question about the article that REQUIRES using TARGET_WORD in the answer.
+              3. Question Format: "In one sentence, [article-based task]. Use the word '[TARGET_WORD]' in your answer."
+              4. correctAnswer: A complete model sentence containing TARGET_WORD (or inflected form).
+              5. explanation: "Target word: TARGET_WORD"
+              6. options MUST be an empty object {}.
+            - Do NOT use generic fill-in-the-blanks or "Use the word in any sentence".
+
+            Output strictly in this JSON format:
+            {
+              "quizzes": [
+                {
+                  "type": "MULTIPLE_CHOICE",
+                  "question": "...",
+                  "options": {
+                    "choices": [
+                      {"key": "A", "text": "...", "explanation": "..."},
+                      {"key": "B", "text": "...", "explanation": "..."},
+                      {"key": "C", "text": "...", "explanation": "..."},
+                      {"key": "D", "text": "...", "explanation": "..."}
+                    ]
+                  },
+                  "correctAnswer": "A",
+                  "explanation": "..."
+                },
+                {
+                  "type": "MULTIPLE_CHOICE",
+                  "question": "...",
+                  "options": {
+                    "choices": [
+                      {"key": "A", "text": "...", "explanation": "..."},
+                      {"key": "B", "text": "...", "explanation": "..."},
+                      {"key": "C", "text": "...", "explanation": "..."},
+                      {"key": "D", "text": "...", "explanation": "..."}
+                    ]
+                  },
+                  "correctAnswer": "B",
+                  "explanation": "..."
+                },
+                {
+                  "type": "SHORT_ANSWER",
+                  "question": "In one sentence, [task]. Use the word '[TARGET_WORD]' in your answer.",
+                  "options": {},
+                  "correctAnswer": "...",
+                  "explanation": "Target word: [TARGET_WORD]"
+                }
+              ]
+            }
+
+            [VOCABULARY]
+            {VOCABULARY}
+
+            [ARTICLE CONTENT]
+            {CONTENT}
+            """;
+
+    public String buildSourceDigestPrompt(String originalContent) {
+        return SOURCE_DIGEST_TEMPLATE.replace("{ORIGINAL_CONTENT}", originalContent);
+    }
+
+    public String buildContentPrompt(String sourceText, DifficultyLevel level) {
+        return CONTENT_TEMPLATE
                 .replace("{LEVEL}", level.name())
-                .replace("{ORIGINAL_CONTENT}", originalContent);
+                .replace("{SOURCE_TEXT}", sourceText);
+    }
+
+    public String buildVocabularyPrompt(String content, DifficultyLevel level) {
+        return VOCABULARY_TEMPLATE.replace("{CONTENT}", content);
+    }
+
+    public String buildQuizPrompt(String content, String vocabularyJson) {
+        return QUIZ_TEMPLATE
+                .replace("{CONTENT}", content)
+                .replace("{VOCABULARY}", vocabularyJson);
     }
 }
