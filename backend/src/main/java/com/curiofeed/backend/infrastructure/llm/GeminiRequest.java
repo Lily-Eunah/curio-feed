@@ -1,5 +1,7 @@
 package com.curiofeed.backend.infrastructure.llm;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.util.List;
 import java.util.Map;
 
@@ -9,6 +11,7 @@ public record GeminiRequest(List<Content> contents, GenerationConfig generationC
 
     public record Part(String text) {}
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record GenerationConfig(
             Double temperature,
             String responseMimeType,
