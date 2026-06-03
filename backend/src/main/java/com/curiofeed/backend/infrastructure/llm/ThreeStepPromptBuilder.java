@@ -55,10 +55,16 @@ public class ThreeStepPromptBuilder {
 
         String spec = switch (level) {
             case EASY -> """
-                    EASY (A2-B1 level):
-                    • Keep sentences short — aim for 12-15 words per sentence.
-                    • Use only common vocabulary a 10-year-old native speaker would know.
-                    • Explain difficult ideas in simple words.
+                    EASY (B1 level — for learners transitioning from A2 to B1):
+                    • Write at a clear, natural B1 level. Do NOT oversimplify to only A1/A2 vocabulary —
+                      this audience is actively studying English and benefits from encountering B1 words in context.
+                    • Sentence length: 12-18 words on average. Vary length for natural flow.
+                    • Vocabulary: everyday words form the base, but B1-level words are welcome and encouraged
+                      where they fit naturally (e.g., debate, significant, consequence, reveal, generate,
+                      assess, trend, concern, attempt, influence, demonstrate, oppose, argue, establish).
+                    • Connectives: however, therefore, although, as a result, meanwhile are all appropriate.
+                    • Explain any concept beyond B1 in a brief follow-up phrase, but trust the reader
+                      to handle standard B1 vocabulary without explanation.
                     • Include about 5-6 core facts from the source.
                     • Target: 180~260 words.
                     • Absolute hard limit: 320 words.
@@ -67,7 +73,7 @@ public class ThreeStepPromptBuilder {
                       Paragraph 2 — key details (who did what, immediate consequences).
                       Paragraph 3 — background or broader impact.""";
             case MEDIUM -> """
-                    MEDIUM (B1-B2 level):
+                    MEDIUM (B2 level — for learners moving from B1 to B2):
                     • Natural news-writing style with moderate sentence variety.
                     • Topic-specific vocabulary is acceptable if context makes it clear.
                     • Include about 6-8 core facts from the source.
