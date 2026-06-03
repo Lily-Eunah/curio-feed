@@ -23,6 +23,10 @@ public class GeminiLlmClient implements LlmClient {
      */
     private static final Semaphore CALL_LOCK = new Semaphore(1, true);
 
+    /** Free Plan RPM(15회/분)을 준수하기 위한 최소 호출 간격 (4초) */
+    private static final long MIN_INTERVAL_MS = 4000L;
+    private static long lastCallTimeMs = 0;
+
     /** 429 발생 시 최대 재시도 횟수 */
     private static final int MAX_RATE_LIMIT_RETRIES = 2;
     private static final long BACKOFF_MS = 20_000L;
@@ -48,6 +52,11 @@ public class GeminiLlmClient implements LlmClient {
     public String generate(String prompt, Map<String, Object> schema) {
         try {
             CALL_LOCK.acquire();
+            long now = System.currentTimeMillis();
+            long timeSinceLastCall = now - lastCallTimeMs;
+            if (timeSinceLastCall < MIN_INTERVAL_MS) {
+                sleepUninterruptibly(MIN_INTERVAL_MS - timeSinceLastCall);
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new LlmClientException("Interrupted while waiting for Gemini call lock", e);
@@ -68,6 +77,7 @@ public class GeminiLlmClient implements LlmClient {
             }
             throw new LlmClientException("Gemini generate unreachable");
         } finally {
+            lastCallTimeMs = System.currentTimeMillis();
             CALL_LOCK.release();
         }
     }
