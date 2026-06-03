@@ -445,10 +445,27 @@ public class ThreeStepPromptBuilder {
     }
 
     public static Map<String, Object> quizSchema() {
+        // Choice item: {key, text, explanation}
+        Map<String, Object> choiceItemProps = new LinkedHashMap<>();
+        choiceItemProps.put("key", Map.of("type", "string"));
+        choiceItemProps.put("text", Map.of("type", "string"));
+        choiceItemProps.put("explanation", Map.of("type", "string"));
+        Map<String, Object> choiceItem = new LinkedHashMap<>();
+        choiceItem.put("type", "object");
+        choiceItem.put("required", List.of("key", "text"));
+        choiceItem.put("properties", choiceItemProps);
+
+        // options: {choices: [...]} — choices is optional so Q3 (SHORT_ANSWER) can be {}
+        Map<String, Object> optionsProps = new LinkedHashMap<>();
+        optionsProps.put("choices", Map.of("type", "array", "items", choiceItem));
+        Map<String, Object> optionsSchema = new LinkedHashMap<>();
+        optionsSchema.put("type", "object");
+        optionsSchema.put("properties", optionsProps);
+
         Map<String, Object> quizProps = new LinkedHashMap<>();
         quizProps.put("type", Map.of("type", "string", "enum", List.of("MULTIPLE_CHOICE", "SHORT_ANSWER")));
         quizProps.put("question", Map.of("type", "string"));
-        quizProps.put("options", Map.of("type", "object"));
+        quizProps.put("options", optionsSchema);
         quizProps.put("correctAnswer", Map.of("type", "string"));
         quizProps.put("explanation", Map.of("type", "string"));
 
