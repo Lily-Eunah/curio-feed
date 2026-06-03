@@ -6,11 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 public class GeminiLlmClient implements LlmClient {
 
@@ -19,12 +18,12 @@ public class GeminiLlmClient implements LlmClient {
     private static final String GENERATE_PATH = "/v1beta/models/{model}:generateContent";
 
     /**
-     * 모든 GeminiLlmClient 인스턴스가 공유하는 슬라이딩 윈도우 rate limiter.
-     * 무료 티어 10 RPM 한계에 여유를 두고 8 RPM으로 제한한다.
+     * 모든 GeminiLlmClient 인스턴스가 공유하는 뮤텍스.
+     * 한 번에 하나의 Gemini 호출만 진행되도록 보장해 429를 원천 차단한다.
      */
-    private static final SlidingWindowRateLimiter RATE_LIMITER = new SlidingWindowRateLimiter(8, 60_000L);
+    private static final Semaphore CALL_LOCK = new Semaphore(1, true);
 
-    /** 429 발생 시 최대 재시도 횟수 (rate limiter가 있으므로 낮게 설정) */
+    /** 429 발생 시 최대 재시도 횟수 */
     private static final int MAX_RATE_LIMIT_RETRIES = 2;
     private static final long BACKOFF_MS = 20_000L;
 
@@ -47,22 +46,30 @@ public class GeminiLlmClient implements LlmClient {
 
     @Override
     public String generate(String prompt, Map<String, Object> schema) {
-        for (int attempt = 1; attempt <= MAX_RATE_LIMIT_RETRIES + 1; attempt++) {
-            // 호출 전에 슬롯 확보 — 필요하면 대기
-            RATE_LIMITER.acquire();
-            try {
-                return doGenerate(prompt, schema);
-            } catch (RateLimitException e) {
-                if (attempt > MAX_RATE_LIMIT_RETRIES) {
-                    throw new LlmClientException(
-                            "Gemini rate limit exceeded after " + MAX_RATE_LIMIT_RETRIES + " retries (model=" + model + ")");
-                }
-                log.warn("[GeminiLlmClient] 429 received despite rate limiter — waiting {}s before retry {}/{}  model={}",
-                        BACKOFF_MS / 1000, attempt, MAX_RATE_LIMIT_RETRIES, model);
-                sleepUninterruptibly(BACKOFF_MS);
-            }
+        try {
+            CALL_LOCK.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmClientException("Interrupted while waiting for Gemini call lock", e);
         }
-        throw new LlmClientException("Gemini generate unreachable");
+        try {
+            for (int attempt = 1; attempt <= MAX_RATE_LIMIT_RETRIES + 1; attempt++) {
+                try {
+                    return doGenerate(prompt, schema);
+                } catch (RateLimitException e) {
+                    if (attempt > MAX_RATE_LIMIT_RETRIES) {
+                        throw new LlmClientException(
+                                "Gemini rate limit exceeded after " + MAX_RATE_LIMIT_RETRIES + " retries (model=" + model + ")");
+                    }
+                    log.warn("[GeminiLlmClient] 429 received — waiting {}s before retry {}/{}  model={}",
+                            BACKOFF_MS / 1000, attempt, MAX_RATE_LIMIT_RETRIES, model);
+                    sleepUninterruptibly(BACKOFF_MS);
+                }
+            }
+            throw new LlmClientException("Gemini generate unreachable");
+        } finally {
+            CALL_LOCK.release();
+        }
     }
 
     private String doGenerate(String prompt, Map<String, Object> schema) {
@@ -141,44 +148,5 @@ public class GeminiLlmClient implements LlmClient {
     /** 429 전용 내부 예외 */
     private static class RateLimitException extends RuntimeException {
         RateLimitException(String message) { super(message); }
-    }
-
-    /**
-     * 슬라이딩 윈도우 방식의 rate limiter.
-     * 최근 windowMs 내에 maxCalls 개 이상의 호출이 있으면, 가장 오래된 호출이 윈도우를 벗어날 때까지 대기한다.
-     */
-    private static final class SlidingWindowRateLimiter {
-
-        private final int maxCalls;
-        private final long windowMs;
-        private final Deque<Long> timestamps = new ArrayDeque<>();
-
-        SlidingWindowRateLimiter(int maxCalls, long windowMs) {
-            this.maxCalls = maxCalls;
-            this.windowMs = windowMs;
-        }
-
-        synchronized void acquire() {
-            while (true) {
-                long now = System.currentTimeMillis();
-                // 윈도우 밖으로 나간 타임스탬프 제거
-                while (!timestamps.isEmpty() && now - timestamps.peekFirst() >= windowMs) {
-                    timestamps.pollFirst();
-                }
-                if (timestamps.size() < maxCalls) {
-                    timestamps.addLast(now);
-                    return;
-                }
-                // 가장 오래된 호출이 윈도우를 벗어날 때까지 대기
-                long waitMs = windowMs - (now - timestamps.peekFirst()) + 50;
-                log.debug("[RateLimiter] slot full ({}/{}), waiting {}ms", timestamps.size(), maxCalls, waitMs);
-                try {
-                    wait(waitMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new LlmClientException("Interrupted while waiting for Gemini rate-limit slot", e);
-                }
-            }
-        }
     }
 }
