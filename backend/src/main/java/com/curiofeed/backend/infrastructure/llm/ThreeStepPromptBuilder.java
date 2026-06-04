@@ -55,19 +55,33 @@ public class ThreeStepPromptBuilder {
 
         String spec = switch (level) {
             case EASY -> """
-                    EASY (A2-B1 level):
-                    • Keep sentences short — aim for 12-15 words per sentence.
-                    • Use only common vocabulary a 10-year-old native speaker would know.
-                    • Explain difficult ideas in simple words.
+                    EASY — simplified newspaper style for motivated adult learners (A2→B1 transition):
+                    Write like a real news article that has been made easier — NOT like a children's book.
+
+                    WHAT TO KEEP (do NOT simplify these):
+                    • Specific facts: exact numbers, real organization names, real places, named people.
+                      "social media ad revenue is projected to reach $317 billion" — keep the number.
+                      "Instagram and TikTok use algorithms" — keep the word 'algorithm', do not write 'smart computers'.
+                    • The natural vocabulary of the subject: words like significant, reveal, decline, strategy,
+                      consequence, debate, attempt, challenge, influence, concern, trend, recognize, respond.
+                      These are normal news words — do not replace them with simpler synonyms.
+                    • Connectives that show logic: however, therefore, although, as a result, meanwhile.
+
+                    WHAT TO SIMPLIFY:
+                    • Long complex sentences: break into two if a single sentence has more than 3 clauses.
+                    • Technical jargon beyond B1: briefly clarify in a parenthetical or follow-up phrase.
+                    • Idiomatic or culture-specific expressions that a non-native reader would not recognize.
+
+                    • Mix shorter sentences (8-12 words) with medium ones (14-20 words) for natural rhythm.
                     • Include about 5-6 core facts from the source.
-                    • Target: 180~260 words.
+                    • Target: 200~280 words.
                     • Absolute hard limit: 320 words.
                     • Paragraph structure: Write EXACTLY 3 paragraphs.
                       Paragraph 1 — the main event (what happened).
                       Paragraph 2 — key details (who did what, immediate consequences).
                       Paragraph 3 — background or broader impact.""";
             case MEDIUM -> """
-                    MEDIUM (B1-B2 level):
+                    MEDIUM (B2 level — for learners moving from B1 to B2):
                     • Natural news-writing style with moderate sentence variety.
                     • Topic-specific vocabulary is acceptable if context makes it clear.
                     • Include about 6-8 core facts from the source.
@@ -89,7 +103,7 @@ public class ThreeStepPromptBuilder {
         };
 
         return """
-                You are an expert English content adapter for language learners.
+                You are a journalist writing calibrated news articles for English learners at different proficiency levels.
 
                 %s
 
@@ -128,20 +142,38 @@ public class ThreeStepPromptBuilder {
 
     public String buildVocabularyPrompt(String generatedContent, DifficultyLevel level) {
         String spec = switch (level) {
-            case EASY -> "EASY (A2-B1): Words a learner would encounter in B1 reading but may not fully understand. Not trivial, not too complex.";
-            case MEDIUM -> "MEDIUM (B1-B2): Academic or journalism-register vocabulary that appears naturally in news writing.";
-            case HARD -> "HARD (C1): Advanced, domain-specific vocabulary that signals sophisticated writing.";
+            case EASY -> """
+                    EASY — target B1 CEFR level words.
+                    MINIMUM BAR: The word must require intentional study for an A2 learner.
+                    REJECT if any of the following is true:
+                      • A 10-year-old native speaker would already know this word without studying → too simple (A1/A2)
+                        Examples of words to ALWAYS reject at EASY: exercise, research, progress, improve, amount, benefit, digital, request, stable, record, difficult, simple, modern, popular, important, create, develop, problem, result, process
+                      • The word is the article's own topic keyword (e.g., in a strength-training article, reject 'exercise', 'training', 'muscle'; in a tech article, reject 'chip', 'computer', 'data', 'software')
+                      • The word appears so frequently across all news that it carries no distinctive learning value""";
+            case MEDIUM -> """
+                    MEDIUM — target B2 CEFR level words.
+                    MINIMUM BAR: The word should challenge a confident B1 learner.
+                    REJECT if any of the following is true:
+                      • A learner who has finished a B1 course would already know and control this word comfortably → too simple
+                      • The word is a basic B1 word clearly more suited to the EASY level
+                        Examples of words to ALWAYS reject at MEDIUM: standard, traditional, expand, analyze, apply, consider, suggest, provide, increase, various, achieve, feature, structure""";
+            case HARD -> """
+                    HARD — target C1 CEFR level words.
+                    MINIMUM BAR: The word should require intentional vocabulary study even for a B2 learner.
+                    REJECT if any of the following is true:
+                      • A B2 learner would recognize and actively use this word without difficulty → too simple
+                      • The word is a B1/B2 word more appropriate for EASY or MEDIUM level""";
         };
 
         return """
                 You are an English vocabulary educator.
+                Your task has TWO phases. Complete Phase 0 BEFORE Phase 1.
 
-                Extract exactly 5 vocabulary words from the %s-level news article below.
-
-                DIFFICULTY TARGET: %s
+                DIFFICULTY TARGET:
+                %s
 
                 ════ BASE FORM RULE — CRITICAL ════════════════════════════════════════
-                Always list the dictionary base form, never an inflected form.
+                Always use the dictionary base form, never an inflected form.
 
                   content: "targeted"    → vocab word: "target"     ✓
                   content: "targeted"    → vocab word: "targeted"   ✗ WRONG
@@ -151,23 +183,23 @@ public class ThreeStepPromptBuilder {
                   content: "depreciation"→ vocab word: "depreciate" ✓
                 ════════════════════════════════════════════════════════════════════════
 
-                EXTRACTION STEPS (follow in this exact order):
-                  A. Read every word in the content.
-                  B. Identify 5 candidates that are educationally valuable and level-appropriate.
-                  C. For each candidate, verify: does the BASE FORM or any inflected form appear in the content?
-                     If NO match found → reject this candidate, pick another.
-                  D. Write the BASE FORM as the vocabulary entry.
-                  E. Cross-check: is any of your 5 words on the FORBIDDEN LIST below?
-                     If YES → remove it immediately, pick a different word.
+                ══ PHASE 0 — CANDIDATE SCAN ════════════════════════════════════════════
+                Scan EVERY word in the [CONTENT] below.
+                Write the BASE FORM of every word that satisfies ALL of the following:
+                  (a) The base form or an inflected form appears in the content.
+                  (b) The word passes the DIFFICULTY TARGET — none of the REJECT conditions apply.
 
-                ════ FORBIDDEN LIST — NEVER include these words ════════════════════
-                  say, make, give, take, use, help, start, get, go, come, keep, put,
-                  show, move, run, turn, set, ask, need, want, tell, work, call, feel,
-                  look, know, think, block, connect, continue, approach, container,
-                  project, big, small, many, few, main, major, important, good, bad,
-                  thing, place, level, number, area, violation, agreement, warning,
-                  attack, change, open, close, allow, stop, hold, send, bring
-                ════════════════════════════════════════════════════════════════════════
+                Write all qualifying words in the "candidates" array.
+                Do NOT skip rare or less-common words — include every eligible word you find.
+                Aim for at least 8–15 candidates. If you find fewer than 5, slightly lower your bar.
+
+                ══ PHASE 1 — SELECTION ═════════════════════════════════════════════════
+                From your "candidates" list, choose exactly 5 words for "vocabularies".
+
+                Prefer words that:
+                  • Offer the highest learning value (learners will encounter them in other contexts)
+                  • Are specific and memorable, not vague or generic
+                  • Are NOT near-synonyms of each other (e.g., do not pick both 'incorporate' and 'integrate')
 
                 DEFINITION FORMAT — every definition MUST follow this exact pattern:
                   "[brief meaning] — used when [specific situation or condition]"
@@ -180,19 +212,20 @@ public class ThreeStepPromptBuilder {
                   • Must NOT reference the article's topic, country, or any person named in the article.
 
                 ════ SELF-CHECK before outputting ════════════════════════════════════
-                For each of your 5 words:
-                  1. Is it the BASE FORM (not inflected)?  If NO → fix it.
-                  2. Does it or an inflected form appear in the content?  If NO → replace it.
-                  3. Is it on the FORBIDDEN LIST?  If YES → replace it.
+                For each of your 5 selected words:
+                  1. Is it in the "candidates" list?  If NO → it is not allowed.
+                  2. Is it the BASE FORM (not inflected)?  If NO → fix it.
+                  3. Does it pass the DIFFICULTY TARGET minimum bar?  If NO → replace it.
                   4. Does the definition end with a "used when" clause?  If NO → rewrite it.
+                  5. Is another selected word a near-synonym of this one?  If YES → replace the weaker of the two.
                 ════════════════════════════════════════════════════════════════════════
 
                 Return ONLY this JSON — no other text:
-                {"vocabularies": [{"word": "...", "definition": "...", "exampleSentence": "..."}, ...]}
+                {"candidates": ["word1", "word2", ...], "vocabularies": [{"word": "...", "definition": "...", "exampleSentence": "..."}, ...]}
 
                 [CONTENT]
                 %s
-                """.formatted(level.name(), spec, generatedContent);
+                """.formatted(spec, generatedContent);
     }
 
     // ── Step 3: Quiz ──────────────────────────────────────────────────────────
@@ -225,10 +258,13 @@ public class ThreeStepPromptBuilder {
 
                 ════ QUIZ 2 — MULTIPLE_CHOICE — Passage Reasoning ══════════════════
                 Test cause-effect, motivation, or inference from the article.
-                The correct answer must require understanding the passage, not just finding one sentence.
 
                 ⚠ Do NOT ask about vocabulary word definitions. ⚠
                 ⚠ Do NOT ask "Which sentence uses the word X correctly?" ⚠
+                ⚠ CRITICAL: The correct answer must NOT be found in a single sentence of the article.
+                  If a learner can locate one sentence and immediately answer, it is a lookup — redesign as Q1.
+                  Q2 requires connecting information from at least two different parts of the article,
+                  OR drawing a logical conclusion that goes beyond what is explicitly stated. ⚠
 
                 GOOD question starters:
                   ✓ "Why did X happen despite Y?"
@@ -264,7 +300,9 @@ public class ThreeStepPromptBuilder {
 
                 ════ FINAL CHECKLIST ═══════════════════════════════════════════════
                   □ Q1: comprehension — main idea or central situation, not a factual lookup.
+                     → If Q1 begins with "What can be inferred", that is a Q2 pattern — redesign Q1.
                   □ Q2: reasoning — cause/effect or inference, not a vocabulary definition question.
+                     → If the correct answer appears in a single sentence of the article, Q2 is too shallow — add synthesis or inference depth.
                   □ Q3: "question" explicitly names the target vocab word and asks about the article.
                   □ Q3: "correctAnswer" is a complete sentence containing the target vocab word.
                   □ Q3: "options" is {}.
@@ -347,13 +385,30 @@ public class ThreeStepPromptBuilder {
     }
 
     /**
+     * Builds a corrective retry prompt for Step 2 when selected words overlap with recent articles.
+     * Appends a small exclusion list (only the duplicate words) to the base prompt.
+     */
+    public String buildVocabularyDeduplicationRetryPrompt(String generatedContent, DifficultyLevel level,
+                                                          List<String> excludeWords) {
+        String exclusionList = String.join(", ", excludeWords);
+        String correction = "\n⚠ CORRECTION: The following words have been used in recent articles and must NOT appear in your Phase 1 selection: "
+                + exclusionList + ". In Phase 1, choose different words from your Phase 0 candidates list that do NOT match this exclusion list.";
+        String base = buildVocabularyPrompt(generatedContent, level);
+        return base.replaceFirst(
+                "(You are an English vocabulary educator\\.)",
+                "$1" + correction);
+    }
+
+    /**
      * Builds a corrective retry prompt for Step 2.
      * @param retryReason "word_not_in_content" | other
      */
     public String buildVocabularyRetryPrompt(String generatedContent, DifficultyLevel level, String retryReason) {
         String correction = switch (retryReason) {
-            case "word_not_in_content" -> "\n⚠ CORRECTION: Choose only words that appear in the generated article body " +
-                    "as base or inflected forms. Do NOT invent words absent from the text.";
+            case "word_not_in_content" -> "\n⚠ CORRECTION: In Phase 0, list only words whose base or inflected form " +
+                    "actually appears in the content. In Phase 1, select only from the Phase 0 candidates. " +
+                    "Do NOT invent words absent from the text. " +
+                    "Also ensure every word meets the DIFFICULTY TARGET minimum bar for this level.";
             default -> "";
         };
         String base = buildVocabularyPrompt(generatedContent, level);
@@ -425,6 +480,11 @@ public class ThreeStepPromptBuilder {
     }
 
     public static Map<String, Object> vocabularySchema() {
+        // candidates: Phase 0 scan result — string array, declared first so Gemini generates it before vocabularies
+        Map<String, Object> candidatesArr = new LinkedHashMap<>();
+        candidatesArr.put("type", "array");
+        candidatesArr.put("items", Map.of("type", "string"));
+
         Map<String, Object> itemProps = new LinkedHashMap<>();
         itemProps.put("word", Map.of("type", "string"));
         itemProps.put("definition", Map.of("type", "string"));
@@ -443,11 +503,12 @@ public class ThreeStepPromptBuilder {
         arr.put("items", item);
 
         Map<String, Object> props = new LinkedHashMap<>();
+        props.put("candidates", candidatesArr);  // before vocabularies — order matters for chain-of-thought
         props.put("vocabularies", arr);
 
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
-        schema.put("required", List.of("vocabularies"));
+        schema.put("required", List.of("candidates", "vocabularies"));
         schema.put("properties", props);
         schema.put("additionalProperties", false);
         return schema;
