@@ -100,6 +100,10 @@ public class Article extends BaseEntity {
         this.status = newStatus;
     }
 
+    public void updateTitle(String newTitle) {
+        this.title = newTitle;
+    }
+
     public void incrementViewCount() {
         this.viewCount++;
     }
