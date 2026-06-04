@@ -40,6 +40,7 @@ export default function ArticleDetail({
   const [currentLevel, setCurrentLevel] = useState<DifficultyLevel>(userLevel);
   const [levelToast, setLevelToast] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -78,15 +79,23 @@ export default function ArticleDetail({
   useEffect(() => {
     if (audioRef.current && isPlaying) {
       audioRef.current.pause();
-      setIsPlaying(false);
-      setCurrentTime(0);
     }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsLoadingAudio(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLevel]);
+  }, [currentLevel, articleId]);
 
   const handlePlay = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+      if (audioRef.current.readyState < 3) {
+        setIsLoadingAudio(true);
+      }
+      audioRef.current.play().catch(e => {
+        console.error("Audio play failed:", e);
+        setIsLoadingAudio(false);
+      });
     }
   }, []);
 
@@ -250,15 +259,19 @@ export default function ArticleDetail({
             </h1>
 
             {/* Native Audio Element */}
+            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
             <audio
               ref={audioRef}
               src={audioUrl}
+              onWaiting={() => setIsLoadingAudio(true)}
+              onPlaying={() => setIsLoadingAudio(false)}
+              onCanPlay={() => setIsLoadingAudio(false)}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-              onError={() => console.error("Failed to load audio")}
+              onError={() => { console.error("Failed to load audio"); setIsLoadingAudio(false); }}
             />
 
             {/* TTS Controls */}
@@ -276,12 +289,17 @@ export default function ArticleDetail({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: isLoadingAudio ? 'wait' : 'pointer',
                   flexShrink: 0
                 }}
-                aria-label={!isPlaying ? "Play article audio" : "Pause article audio"}
+                disabled={isLoadingAudio}
+                aria-label={isLoadingAudio ? "Loading audio" : !isPlaying ? "Play article audio" : "Pause article audio"}
               >
-                {!isPlaying ? (
+                {isLoadingAudio ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                ) : !isPlaying ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 ) : (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
@@ -299,12 +317,13 @@ export default function ArticleDetail({
                   onChange={handleSeek}
                   style={{
                     flex: 1,
-                    cursor: 'pointer',
+                    cursor: isLoadingAudio || duration === 0 ? 'not-allowed' : 'pointer',
                     accentColor: COLORS.accent
                   }}
+                  disabled={isLoadingAudio || duration === 0}
                 />
                 <div style={{ fontSize: 12, color: COLORS.textSec, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                  {duration === 0 || isLoadingAudio ? "--:--" : formatTime(currentTime)} / {duration === 0 ? "--:--" : formatTime(duration)}
                 </div>
               </div>
             </div>
