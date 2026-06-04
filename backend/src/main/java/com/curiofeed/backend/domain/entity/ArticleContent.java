@@ -46,6 +46,9 @@ public class ArticleContent extends BaseEntity {
 
     private String audioUrl;
 
+    @Column(name = "audio_data")
+    private byte[] audioData;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "article_id", nullable = false)
     private Article article;
@@ -66,5 +69,9 @@ public class ArticleContent extends BaseEntity {
 
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    public void updateAudioData(byte[] audioData) {
+        this.audioData = audioData;
     }
 }
