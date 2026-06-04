@@ -66,6 +66,7 @@ public class ThreeStepSubJobWorker {
     private final VocabStepValidator vocabValidator;
     private final QuizStepValidator quizValidator;
     private final VocabLemmatizer vocabLemmatizer;
+    private final TitleSimilarityValidator titleSimilarityValidator;
 
     private final GenerationResultSaver resultSaver;
     private final ArticleStatusAggregator aggregator;
@@ -87,6 +88,7 @@ public class ThreeStepSubJobWorker {
             VocabStepValidator vocabValidator,
             QuizStepValidator quizValidator,
             VocabLemmatizer vocabLemmatizer,
+            TitleSimilarityValidator titleSimilarityValidator,
             GenerationResultSaver resultSaver,
             ArticleStatusAggregator aggregator) {
         this.lockService = lockService;
@@ -105,6 +107,7 @@ public class ThreeStepSubJobWorker {
         this.vocabValidator = vocabValidator;
         this.quizValidator = quizValidator;
         this.vocabLemmatizer = vocabLemmatizer;
+        this.titleSimilarityValidator = titleSimilarityValidator;
         this.resultSaver = resultSaver;
         this.aggregator = aggregator;
     }
@@ -321,10 +324,16 @@ public class ThreeStepSubJobWorker {
         step.markProcessing();
         stepJobRepository.save(step);
 
+        boolean titleTooSimilar = false;
+
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
             Instant start = Instant.now();
             try {
-                String prompt = promptBuilder.buildSourceDigestPrompt(originalTitle, originalContent);
+                String prompt = titleTooSimilar
+                        ? promptBuilder.buildSourceDigestRetryPrompt(originalTitle, originalContent)
+                        : promptBuilder.buildSourceDigestPrompt(originalTitle, originalContent);
+                titleTooSimilar = false;
+
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.sourceDigestSchema(), subJobId, "SOURCE_DIGEST");
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms",
@@ -338,7 +347,18 @@ public class ThreeStepSubJobWorker {
                     throw new IllegalStateException("SourceDigest missing from LLM response");
                 }
 
-                step.markCompleted("PASS");
+                boolean similarTitle = titleSimilarityValidator.isTooSimilar(digest.suggestedTitle(), originalTitle);
+                if (similarTitle) {
+                    log.warn("[telemetry] subJob={} step=SOURCE_DIGEST attempt={} title_too_similar=true generated='{}' original='{}'",
+                            subJobId, attempt, digest.suggestedTitle(), originalTitle);
+                    if (attempt < MAX_STEP_RETRIES) {
+                        titleTooSimilar = true;
+                        continue;
+                    }
+                    log.warn("[subJob={}] Title still too similar after {} attempts — proceeding best-effort", subJobId, attempt);
+                }
+
+                step.markCompleted(similarTitle ? "PASS_WITH_WARNINGS" : "PASS");
                 stepJobRepository.save(step);
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms",
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());

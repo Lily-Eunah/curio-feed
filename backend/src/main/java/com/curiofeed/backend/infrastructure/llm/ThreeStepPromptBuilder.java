@@ -354,6 +354,21 @@ public class ThreeStepPromptBuilder {
     // ── Retry prompts (corrective instructions for known failure modes) ───────
 
     /**
+     * Builds a corrective retry prompt for SOURCE_DIGEST when the suggested title
+     * is too similar to the original (detected by TitleSimilarityValidator).
+     */
+    public String buildSourceDigestRetryPrompt(String originalTitle, String originalArticle) {
+        String correction = "\n⚠ CORRECTION: The suggested title was too similar to the original title. " +
+                "Generate a completely different title — avoid repeating these specific words and phrases: \"" +
+                originalTitle + "\". " +
+                "Choose a different angle, verb, and sentence structure.";
+        String base = buildSourceDigestPrompt(originalTitle, originalArticle);
+        return base.replaceFirst(
+                "(You are a precise information analyst\\.)",
+                "$1" + correction);
+    }
+
+    /**
      * Builds a corrective retry prompt for Step 1.
      */
     public String buildContentRetryPrompt(String sourceText, DifficultyLevel level,
@@ -384,7 +399,7 @@ public class ThreeStepPromptBuilder {
 
         String base = buildContentPrompt(sourceText, level, isDigestBased);
         return base.replaceFirst(
-                "(You are an expert English content adapter for language learners\\.)",
+                "(You are a journalist writing calibrated news articles for English learners at different proficiency levels\\.)",
                 "$1" + correction);
     }
 
