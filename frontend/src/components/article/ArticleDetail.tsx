@@ -35,12 +35,13 @@ export default function ArticleDetail({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [vocabSheet, setVocabSheet] = useState<VocabEntry | null>(null);
   const [currentLevel, setCurrentLevel] = useState<DifficultyLevel>(userLevel);
   const [levelToast, setLevelToast] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [ttsProgress, setTtsProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   // Sync with prop (Problem 3)
   useEffect(() => {
@@ -63,65 +64,52 @@ export default function ArticleDetail({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup speech synthesis on unmount or article change
+  const audioUrl = `/api/articles/${articleId}/content/${currentLevel}/audio`;
+
+  // Pause audio when level changes or component unmounts
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     };
   }, [articleId]);
 
-  const handlePlay = useCallback(() => {
-    if (isPaused) {
-      window.speechSynthesis.resume();
-      setIsPaused(false);
-      setIsPlaying(true);
-    } else {
-      window.speechSynthesis.cancel();
-      // Remove html tags if there are any, though article body is assumed plain text or custom format
-      // article.body may contain markdown or html. But we will just feed it as is or strip html.
-      const plainText = article.body.replace(/<[^>]*>?/gm, ''); 
-      const textToRead = article.title + ".\n\n" + plainText;
-      const utterance = new SpeechSynthesisUtterance(textToRead);
-      utterance.lang = 'en-US';
-      
-      utterance.onboundary = (e) => {
-        if (e.name === 'word') {
-          const pct = Math.min(100, (e.charIndex / textToRead.length) * 100);
-          setTtsProgress(pct);
-        }
-      };
-
-      utterance.onend = () => {
-        setIsPlaying(false);
-        setIsPaused(false);
-        setTtsProgress(0);
-      };
-      
-      utterance.onerror = () => {
-        setIsPlaying(false);
-        setIsPaused(false);
-        setTtsProgress(0);
-      };
-
-      window.speechSynthesis.speak(utterance);
-      setIsPlaying(true);
-      setIsPaused(false);
-      setTtsProgress(0);
+  useEffect(() => {
+    if (audioRef.current && isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      setCurrentTime(0);
     }
-  }, [article.title, article.body, isPaused]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLevel]);
+
+  const handlePlay = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+    }
+  }, []);
 
   const handlePause = useCallback(() => {
-    window.speechSynthesis.pause();
-    setIsPaused(true);
-    setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
   }, []);
 
-  const handleStop = useCallback(() => {
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setIsPaused(false);
-    setTtsProgress(0);
+  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = Number(e.target.value);
+    setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
   }, []);
+
+  const formatTime = (time: number) => {
+    if (isNaN(time) || !isFinite(time)) return "00:00";
+    const m = Math.floor(time / 60).toString().padStart(2, '0');
+    const s = Math.floor(time % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   // Scroll tracking: 1s throttle, ≥25% body progress (UI_POLICY §3.1, Performance)
   useEffect(() => {
@@ -261,6 +249,18 @@ export default function ArticleDetail({
               {article.title}
             </h1>
 
+            {/* Native Audio Element */}
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+              onError={() => console.error("Failed to load audio")}
+            />
+
             {/* TTS Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: COLORS.bg, padding: '12px 16px', borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
               {/* Play / Pause button */}
@@ -279,7 +279,7 @@ export default function ArticleDetail({
                   cursor: 'pointer',
                   flexShrink: 0
                 }}
-                aria-label={!isPlaying ? (isPaused ? "Resume reading" : "Listen to article") : "Pause reading"}
+                aria-label={!isPlaying ? "Play article audio" : "Pause article audio"}
               >
                 {!isPlaying ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -288,32 +288,24 @@ export default function ArticleDetail({
                 )}
               </button>
 
-              {/* Stop button (only show if active) */}
-              {(isPlaying || isPaused) && (
-                <button
-                  onClick={handleStop}
+              {/* Progress Bar & Time */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 100}
+                  step="0.1"
+                  value={currentTime}
+                  onChange={handleSeek}
                   style={{
-                    background: COLORS.accentLight,
-                    color: COLORS.accent,
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: 36,
-                    height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    flex: 1,
                     cursor: 'pointer',
-                    flexShrink: 0
+                    accentColor: COLORS.accent
                   }}
-                  aria-label="Stop reading"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
-                </button>
-              )}
-
-              {/* Progress Bar */}
-              <div style={{ flex: 1, height: 6, background: COLORS.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${ttsProgress}%`, height: '100%', background: COLORS.accent, transition: 'width 0.2s linear' }} />
+                />
+                <div style={{ fontSize: 12, color: COLORS.textSec, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </div>
               </div>
             </div>
 
