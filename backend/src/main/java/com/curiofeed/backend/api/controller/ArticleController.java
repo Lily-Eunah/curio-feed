@@ -50,7 +50,7 @@ public class ArticleController {
     }
 
     @GetMapping("/{id}/content/{level}/audio")
-    public ResponseEntity<byte[]> getArticleAudio(
+    public ResponseEntity<org.springframework.core.io.Resource> getArticleAudio(
             @PathVariable("id") UUID id,
             @PathVariable("level") DifficultyLevel level
     ) {
@@ -58,9 +58,15 @@ public class ArticleController {
         if (audioData == null || audioData.length == 0) {
             return ResponseEntity.notFound().build();
         }
+        org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(audioData) {
+            @Override
+            public String getFilename() {
+                return "audio.mp3";
+            }
+        };
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "audio/mpeg")
                 .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=31536000")
-                .body(audioData);
+                .body(resource);
     }
 }

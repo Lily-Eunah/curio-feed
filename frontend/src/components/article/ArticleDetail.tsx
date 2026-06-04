@@ -263,6 +263,7 @@ export default function ArticleDetail({
             <audio
               ref={audioRef}
               src={audioUrl}
+              preload="auto"
               onWaiting={() => setIsLoadingAudio(true)}
               onPlaying={() => setIsLoadingAudio(false)}
               onCanPlay={() => setIsLoadingAudio(false)}
