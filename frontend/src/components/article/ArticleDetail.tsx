@@ -38,6 +38,8 @@ export default function ArticleDetail({
   const [vocabSheet, setVocabSheet] = useState<VocabEntry | null>(null);
   const [currentLevel, setCurrentLevel] = useState<DifficultyLevel>(userLevel);
   const [levelToast, setLevelToast] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Sync with prop (Problem 3)
   useEffect(() => {
@@ -58,6 +60,54 @@ export default function ArticleDetail({
       setTimeout(() => { el.scrollTop = continueReading.scrollPosition; }, 60);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup speech synthesis on unmount or article change
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [articleId]);
+
+  const handlePlay = useCallback(() => {
+    if (isPaused) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+      setIsPlaying(true);
+    } else {
+      window.speechSynthesis.cancel();
+      // Remove html tags if there are any, though article body is assumed plain text or custom format
+      // article.body may contain markdown or html. But we will just feed it as is or strip html.
+      const plainText = article.body.replace(/<[^>]*>?/gm, ''); 
+      const utterance = new SpeechSynthesisUtterance(article.title + ".\n\n" + plainText);
+      utterance.lang = 'en-US';
+      
+      utterance.onend = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+      
+      utterance.onerror = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+      setIsPlaying(true);
+      setIsPaused(false);
+    }
+  }, [article.title, article.body, isPaused]);
+
+  const handlePause = useCallback(() => {
+    window.speechSynthesis.pause();
+    setIsPaused(true);
+    setIsPlaying(false);
+  }, []);
+
+  const handleStop = useCallback(() => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
   }, []);
 
   // Scroll tracking: 1s throttle, ≥25% body progress (UI_POLICY §3.1, Performance)
@@ -197,6 +247,51 @@ export default function ArticleDetail({
             >
               {article.title}
             </h1>
+
+            {/* TTS Controls */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {!isPlaying ? (
+                <button
+                  onClick={handlePlay}
+                  style={{
+                    padding: '8px 16px', background: COLORS.accent, color: '#fff',
+                    border: 'none', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                  aria-label={isPaused ? "Resume reading" : "Listen to article"}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  {isPaused ? 'Resume' : 'Listen'}
+                </button>
+              ) : (
+                <button
+                  onClick={handlePause}
+                  style={{
+                    padding: '8px 16px', background: COLORS.accentLight, color: COLORS.accent,
+                    border: 'none', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                  aria-label="Pause reading"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  Pause
+                </button>
+              )}
+              {(isPlaying || isPaused) && (
+                <button
+                  onClick={handleStop}
+                  style={{
+                    padding: '8px 16px', background: COLORS.bg, color: COLORS.textSec,
+                    border: `1px solid ${COLORS.borderLight}`, borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                  aria-label="Stop reading"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+                  Stop
+                </button>
+              )}
+            </div>
 
             {/* Article body (scroll-tracked) */}
             <ArticleBody
