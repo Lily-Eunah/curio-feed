@@ -23,6 +23,7 @@ public class ArticleController {
 
     private final ArticleFeedService feedService;
     private final ArticleDetailService articleDetailService;
+    private final com.curiofeed.backend.domain.service.ArticleAudioService articleAudioService;
 
     @GetMapping
     public ResponseEntity<CursorPageResponse<ArticleFeedResponse>> getArticleFeed(
@@ -46,5 +47,20 @@ public class ArticleController {
             @RequestParam(name = "level", required = false, defaultValue = "EASY") DifficultyLevel level
     ) {
         return ResponseEntity.ok(articleDetailService.getArticleDetail(id, level));
+    }
+
+    @GetMapping("/{id}/content/{level}/audio")
+    public ResponseEntity<byte[]> getArticleAudio(
+            @PathVariable("id") UUID id,
+            @PathVariable("level") DifficultyLevel level
+    ) {
+        byte[] audioData = articleAudioService.getOrGenerateAudio(id, level);
+        if (audioData == null || audioData.length == 0) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "audio/mpeg")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=31536000")
+                .body(audioData);
     }
 }
