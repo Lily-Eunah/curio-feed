@@ -40,6 +40,7 @@ export default function ArticleDetail({
   const [levelToast, setLevelToast] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [ttsProgress, setTtsProgress] = useState(0);
 
   // Sync with prop (Problem 3)
   useEffect(() => {
@@ -79,22 +80,33 @@ export default function ArticleDetail({
       // Remove html tags if there are any, though article body is assumed plain text or custom format
       // article.body may contain markdown or html. But we will just feed it as is or strip html.
       const plainText = article.body.replace(/<[^>]*>?/gm, ''); 
-      const utterance = new SpeechSynthesisUtterance(article.title + ".\n\n" + plainText);
+      const textToRead = article.title + ".\n\n" + plainText;
+      const utterance = new SpeechSynthesisUtterance(textToRead);
       utterance.lang = 'en-US';
       
+      utterance.onboundary = (e) => {
+        if (e.name === 'word') {
+          const pct = Math.min(100, (e.charIndex / textToRead.length) * 100);
+          setTtsProgress(pct);
+        }
+      };
+
       utterance.onend = () => {
         setIsPlaying(false);
         setIsPaused(false);
+        setTtsProgress(0);
       };
       
       utterance.onerror = () => {
         setIsPlaying(false);
         setIsPaused(false);
+        setTtsProgress(0);
       };
 
       window.speechSynthesis.speak(utterance);
       setIsPlaying(true);
       setIsPaused(false);
+      setTtsProgress(0);
     }
   }, [article.title, article.body, isPaused]);
 
@@ -108,6 +120,7 @@ export default function ArticleDetail({
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
+    setTtsProgress(0);
   }, []);
 
   // Scroll tracking: 1s throttle, ≥25% body progress (UI_POLICY §3.1, Performance)
@@ -249,48 +262,59 @@ export default function ArticleDetail({
             </h1>
 
             {/* TTS Controls */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-              {!isPlaying ? (
-                <button
-                  onClick={handlePlay}
-                  style={{
-                    padding: '8px 16px', background: COLORS.accent, color: '#fff',
-                    border: 'none', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
-                  aria-label={isPaused ? "Resume reading" : "Listen to article"}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  {isPaused ? 'Resume' : 'Listen'}
-                </button>
-              ) : (
-                <button
-                  onClick={handlePause}
-                  style={{
-                    padding: '8px 16px', background: COLORS.accentLight, color: COLORS.accent,
-                    border: 'none', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
-                  aria-label="Pause reading"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                  Pause
-                </button>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: COLORS.bg, padding: '12px 16px', borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
+              {/* Play / Pause button */}
+              <button
+                onClick={!isPlaying ? handlePlay : handlePause}
+                style={{
+                  background: COLORS.accent,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+                aria-label={!isPlaying ? (isPaused ? "Resume reading" : "Listen to article") : "Pause reading"}
+              >
+                {!isPlaying ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                )}
+              </button>
+
+              {/* Stop button (only show if active) */}
               {(isPlaying || isPaused) && (
                 <button
                   onClick={handleStop}
                   style={{
-                    padding: '8px 16px', background: COLORS.bg, color: COLORS.textSec,
-                    border: `1px solid ${COLORS.borderLight}`, borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6
+                    background: COLORS.accentLight,
+                    color: COLORS.accent,
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
                   }}
                   aria-label="Stop reading"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
-                  Stop
                 </button>
               )}
+
+              {/* Progress Bar */}
+              <div style={{ flex: 1, height: 6, background: COLORS.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${ttsProgress}%`, height: '100%', background: COLORS.accent, transition: 'width 0.2s linear' }} />
+              </div>
             </div>
 
             {/* Article body (scroll-tracked) */}
