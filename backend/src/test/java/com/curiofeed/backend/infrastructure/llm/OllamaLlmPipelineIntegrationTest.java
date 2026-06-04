@@ -73,7 +73,7 @@ class OllamaLlmPipelineIntegrationTest {
     @ParameterizedTest(name = "{0} 난이도로 기사 생성 파이프라인이 완전한 결과를 반환한다")
     @EnumSource(DifficultyLevel.class)
     void pipeline_allLevels_returnsFullGenerationResult(DifficultyLevel level) {
-        String prompt = promptBuilder.build(ARTICLE_CONTENT, level);
+        String prompt = promptBuilder.buildContentPrompt(ARTICLE_CONTENT, level);
         String rawResponse = llmClient.generate(prompt);
         GenerationResult result = responseParser.parse(rawResponse, GenerationResult.class);
 

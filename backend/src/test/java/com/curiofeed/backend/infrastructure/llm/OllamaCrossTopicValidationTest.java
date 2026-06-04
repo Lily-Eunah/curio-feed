@@ -82,7 +82,7 @@ class OllamaCrossTopicValidationTest {
         DefaultLlmResponseParser parser = new DefaultLlmResponseParser(new ObjectMapper());
 
         String article = topic.equals("GEOPOLITICS") ? ARTICLE_GEOPOLITICS : ARTICLE_HEALTH;
-        String prompt = promptBuilder.build(article, level);
+        String prompt = promptBuilder.buildContentPrompt(article, level);
         String raw = client.generate(prompt);
         GenerationResult result = parser.parse(raw, GenerationResult.class);
 
