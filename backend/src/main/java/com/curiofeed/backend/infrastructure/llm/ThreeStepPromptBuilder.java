@@ -32,10 +32,12 @@ public class ThreeStepPromptBuilder {
                 3. REMOVE: Minor examples, repeated details, secondary quotes, scene-setting descriptions, and non-essential background.
                 4. DO NOT add any information or interpretations not present in the original article.
                 5. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
+                6. Generate a completely new, engaging English title based solely on the extracted facts. Do NOT copy the original title.
 
                 Return ONLY this JSON:
                 {
                   "sourceDigest": {
+                    "suggestedTitle": "A catchy, original English news title",
                     "centralStory": "1-2 sentences summarizing the main event",
                     "coreFacts": ["Fact 1", "Fact 2", ...],
                     "supportingDetails": ["Detail 1", ...],
@@ -448,6 +450,7 @@ public class ThreeStepPromptBuilder {
 
     public static Map<String, Object> sourceDigestSchema() {
         Map<String, Object> digestProps = new LinkedHashMap<>();
+        digestProps.put("suggestedTitle", Map.of("type", "string"));
         digestProps.put("centralStory", Map.of("type", "string"));
         digestProps.put("coreFacts", Map.of("type", "array", "items", Map.of("type", "string")));
         digestProps.put("supportingDetails", Map.of("type", "array", "items", Map.of("type", "string")));
@@ -455,7 +458,7 @@ public class ThreeStepPromptBuilder {
 
         Map<String, Object> digestObj = new LinkedHashMap<>();
         digestObj.put("type", "object");
-        digestObj.put("required", List.of("centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
+        digestObj.put("required", List.of("suggestedTitle", "centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
         digestObj.put("properties", digestProps);
         digestObj.put("additionalProperties", false);
 
