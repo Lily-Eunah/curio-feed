@@ -125,13 +125,14 @@ public class ThreeStepSubJobWorker {
         UUID articleId = subJob.getJob().getArticleId();
         DifficultyLevel level = subJob.getLevel();
 
-        String originalContent = articleRepository.findById(articleId)
-                .map(Article::getOriginalContent)
+        Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new IllegalStateException("Article not found: " + articleId));
+        String originalContent = article.getOriginalContent();
+        String originalTitle = article.getOriginalTitle();
 
         ScheduledExecutorService heartbeat = startHeartbeat(subJobId);
         try {
-            runPipeline(subJob, articleId, level, originalContent);
+            runPipeline(subJob, articleId, level, originalTitle, originalContent);
         } catch (Exception e) {
             log.error("[subJob={}] Unexpected pipeline error: {}", subJobId, e.getMessage(), e);
             markSubJobFailed(subJob);
@@ -143,7 +144,7 @@ public class ThreeStepSubJobWorker {
     // ── Pipeline orchestration ────────────────────────────────────────────────
 
     private void runPipeline(ArticleGenerationSubJob subJob, UUID articleId,
-                             DifficultyLevel level, String originalContent) {
+                             DifficultyLevel level, String originalTitle, String originalContent) {
         UUID subJobId = subJob.getId();
         int originalWordCount = countWords(originalContent);
 
@@ -152,9 +153,9 @@ public class ThreeStepSubJobWorker {
         boolean isDigestUsed = false;
 
         ArticleGenerationStepJob digestStep = getOrCreateStep(subJob, GenerationStepType.SOURCE_DIGEST);
-        
+
         if (!digestStep.isCompleted()) {
-            GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalContent);
+            GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalTitle, originalContent);
             if (digestData == null) return; // hard fail
             sourceText = formatDigest(digestData);
             isDigestUsed = true;
@@ -313,6 +314,7 @@ public class ThreeStepSubJobWorker {
 
     private GenerationResult.SourceDigestData executeSourceDigestStep(ArticleGenerationStepJob step,
                                                                       ArticleGenerationSubJob subJob,
+                                                                      String originalTitle,
                                                                       String originalContent) {
         UUID subJobId = subJob.getId();
         log.info("[subJob={}] Running SOURCE_DIGEST step", subJobId);
@@ -322,7 +324,7 @@ public class ThreeStepSubJobWorker {
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
             Instant start = Instant.now();
             try {
-                String prompt = promptBuilder.buildSourceDigestPrompt(originalContent);
+                String prompt = promptBuilder.buildSourceDigestPrompt(originalTitle, originalContent);
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.sourceDigestSchema(), subJobId, "SOURCE_DIGEST");
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_RESPONSE_RECEIVED duration={}ms",

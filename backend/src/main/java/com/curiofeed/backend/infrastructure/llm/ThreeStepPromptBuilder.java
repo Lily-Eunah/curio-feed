@@ -21,7 +21,7 @@ public class ThreeStepPromptBuilder {
 
     // ── Step 1: Content ───────────────────────────────────────────────────────
 
-    public String buildSourceDigestPrompt(String originalArticle) {
+    public String buildSourceDigestPrompt(String originalTitle, String originalArticle) {
         return """
                 You are a precise information analyst.
                 Your task is to compress a long news article into a structured "Source Digest" that will be used by another AI to write a short version for language learners.
@@ -32,7 +32,9 @@ public class ThreeStepPromptBuilder {
                 3. REMOVE: Minor examples, repeated details, secondary quotes, scene-setting descriptions, and non-essential background.
                 4. DO NOT add any information or interpretations not present in the original article.
                 5. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
-                6. Generate a completely new, engaging English title based solely on the extracted facts. Do NOT copy the original title.
+                6. Generate a completely new, engaging English title based solely on the extracted facts.
+                   ORIGINAL TITLE (do NOT reuse any phrase of 3 or more consecutive words from this): "%s"
+                   Use a different angle, verb, or structure to express the same facts.
 
                 Return ONLY this JSON:
                 {
@@ -47,7 +49,7 @@ public class ThreeStepPromptBuilder {
 
                 [ORIGINAL ARTICLE]
                 %s
-                """.formatted(originalArticle);
+                """.formatted(originalTitle, originalArticle);
     }
 
     public String buildContentPrompt(String sourceText, DifficultyLevel level, boolean isDigestBased) {
