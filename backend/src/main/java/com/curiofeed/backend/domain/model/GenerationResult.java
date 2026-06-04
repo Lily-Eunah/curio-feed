@@ -29,6 +29,7 @@ public record GenerationResult(
     }
 
     public record SourceDigestData(
+            String suggestedTitle,
             String centralStory,
             List<String> coreFacts,
             List<String> supportingDetails,

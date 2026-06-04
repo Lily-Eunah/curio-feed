@@ -74,7 +74,7 @@ class OllamaTemperatureExperimentTest {
         ArticlePromptBuilder promptBuilder = new ArticlePromptBuilder();
         DefaultLlmResponseParser parser = new DefaultLlmResponseParser(new ObjectMapper());
 
-        String prompt = promptBuilder.build(ARTICLE_CONTENT, level);
+        String prompt = promptBuilder.buildContentPrompt(ARTICLE_CONTENT, level);
         String raw = client.generate(prompt);
         GenerationResult result = parser.parse(raw, GenerationResult.class);
 

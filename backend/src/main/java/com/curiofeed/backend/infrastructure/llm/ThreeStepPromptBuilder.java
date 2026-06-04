@@ -21,7 +21,7 @@ public class ThreeStepPromptBuilder {
 
     // ── Step 1: Content ───────────────────────────────────────────────────────
 
-    public String buildSourceDigestPrompt(String originalArticle) {
+    public String buildSourceDigestPrompt(String originalTitle, String originalArticle) {
         return """
                 You are a precise information analyst.
                 Your task is to compress a long news article into a structured "Source Digest" that will be used by another AI to write a short version for language learners.
@@ -32,10 +32,14 @@ public class ThreeStepPromptBuilder {
                 3. REMOVE: Minor examples, repeated details, secondary quotes, scene-setting descriptions, and non-essential background.
                 4. DO NOT add any information or interpretations not present in the original article.
                 5. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
+                6. Generate a completely new, engaging English title based solely on the extracted facts.
+                   ORIGINAL TITLE (do NOT reuse any phrase of 3 or more consecutive words from this): "%s"
+                   Use a different angle, verb, or structure to express the same facts.
 
                 Return ONLY this JSON:
                 {
                   "sourceDigest": {
+                    "suggestedTitle": "A catchy, original English news title",
                     "centralStory": "1-2 sentences summarizing the main event",
                     "coreFacts": ["Fact 1", "Fact 2", ...],
                     "supportingDetails": ["Detail 1", ...],
@@ -45,7 +49,7 @@ public class ThreeStepPromptBuilder {
 
                 [ORIGINAL ARTICLE]
                 %s
-                """.formatted(originalArticle);
+                """.formatted(originalTitle, originalArticle);
     }
 
     public String buildContentPrompt(String sourceText, DifficultyLevel level, boolean isDigestBased) {
@@ -350,6 +354,21 @@ public class ThreeStepPromptBuilder {
     // ── Retry prompts (corrective instructions for known failure modes) ───────
 
     /**
+     * Builds a corrective retry prompt for SOURCE_DIGEST when the suggested title
+     * is too similar to the original (detected by TitleSimilarityValidator).
+     */
+    public String buildSourceDigestRetryPrompt(String originalTitle, String originalArticle) {
+        String correction = "\n⚠ CORRECTION: The suggested title was too similar to the original title. " +
+                "Generate a completely different title — avoid repeating these specific words and phrases: \"" +
+                originalTitle + "\". " +
+                "Choose a different angle, verb, and sentence structure.";
+        String base = buildSourceDigestPrompt(originalTitle, originalArticle);
+        return base.replaceFirst(
+                "(You are a precise information analyst\\.)",
+                "$1" + correction);
+    }
+
+    /**
      * Builds a corrective retry prompt for Step 1.
      */
     public String buildContentRetryPrompt(String sourceText, DifficultyLevel level,
@@ -380,7 +399,22 @@ public class ThreeStepPromptBuilder {
 
         String base = buildContentPrompt(sourceText, level, isDigestBased);
         return base.replaceFirst(
-                "(You are an expert English content adapter for language learners\\.)",
+                "(You are a journalist writing calibrated news articles for English learners at different proficiency levels\\.)",
+                "$1" + correction);
+    }
+
+    /**
+     * Builds a corrective retry prompt for Step 2 when selected words overlap with recent articles.
+     * Appends a small exclusion list (only the duplicate words) to the base prompt.
+     */
+    public String buildVocabularyDeduplicationRetryPrompt(String generatedContent, DifficultyLevel level,
+                                                          List<String> excludeWords) {
+        String exclusionList = String.join(", ", excludeWords);
+        String correction = "\n⚠ CORRECTION: The following words have been used in recent articles and must NOT appear in your Phase 1 selection: "
+                + exclusionList + ". In Phase 1, choose different words from your Phase 0 candidates list that do NOT match this exclusion list.";
+        String base = buildVocabularyPrompt(generatedContent, level);
+        return base.replaceFirst(
+                "(You are an English vocabulary educator\\.)",
                 "$1" + correction);
     }
 
@@ -448,6 +482,7 @@ public class ThreeStepPromptBuilder {
 
     public static Map<String, Object> sourceDigestSchema() {
         Map<String, Object> digestProps = new LinkedHashMap<>();
+        digestProps.put("suggestedTitle", Map.of("type", "string"));
         digestProps.put("centralStory", Map.of("type", "string"));
         digestProps.put("coreFacts", Map.of("type", "array", "items", Map.of("type", "string")));
         digestProps.put("supportingDetails", Map.of("type", "array", "items", Map.of("type", "string")));
@@ -455,7 +490,7 @@ public class ThreeStepPromptBuilder {
 
         Map<String, Object> digestObj = new LinkedHashMap<>();
         digestObj.put("type", "object");
-        digestObj.put("required", List.of("centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
+        digestObj.put("required", List.of("suggestedTitle", "centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
         digestObj.put("properties", digestProps);
         digestObj.put("additionalProperties", false);
 

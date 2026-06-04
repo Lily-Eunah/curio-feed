@@ -38,13 +38,17 @@ class ThreeStepPipelineLogicTest {
 
     @Test
     void testSourceDigestPromptBuilding() {
+        String originalTitle = "Sample Article Title";
         String original = "Long news article content...";
-        String prompt = promptBuilder.buildSourceDigestPrompt(original);
+        String prompt = promptBuilder.buildSourceDigestPrompt(originalTitle, original);
 
         assertThat(prompt).contains("Source Digest");
         assertThat(prompt).contains("centralStory");
         assertThat(prompt).contains("coreFacts");
+        assertThat(prompt).contains("suggestedTitle");
+        assertThat(prompt).contains(originalTitle);
         assertThat(prompt).contains(original);
+        assertThat(prompt).contains("3 or more consecutive words");
     }
 
     @Test

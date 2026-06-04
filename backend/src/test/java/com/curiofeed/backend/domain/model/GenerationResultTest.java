@@ -54,21 +54,21 @@ class GenerationResultTest {
     @Test
     @DisplayName("hasContent: content가 있으면 true")
     void hasContent_nonBlank_returnsTrue() {
-        GenerationResult result = new GenerationResult("some content", List.of(), List.of(), null);
+        GenerationResult result = new GenerationResult("some content", List.of(), List.of(), null, null);
         assertThat(result.hasContent()).isTrue();
     }
 
     @Test
     @DisplayName("hasContent: content가 null이면 false")
     void hasContent_null_returnsFalse() {
-        GenerationResult result = new GenerationResult(null, List.of(), List.of(), null);
+        GenerationResult result = new GenerationResult(null, List.of(), List.of(), null, null);
         assertThat(result.hasContent()).isFalse();
     }
 
     @Test
     @DisplayName("hasContent: content가 blank이면 false")
     void hasContent_blank_returnsFalse() {
-        GenerationResult result = new GenerationResult("   ", List.of(), List.of(), null);
+        GenerationResult result = new GenerationResult("   ", List.of(), List.of(), null, null);
         assertThat(result.hasContent()).isFalse();
     }
 
@@ -83,14 +83,14 @@ class GenerationResultTest {
     @Test
     @DisplayName("hasVocabularies: null이면 false")
     void hasVocabularies_null_returnsFalse() {
-        GenerationResult result = new GenerationResult("content", null, List.of(), null);
+        GenerationResult result = new GenerationResult("content", null, List.of(), null, null);
         assertThat(result.hasVocabularies()).isFalse();
     }
 
     @Test
     @DisplayName("hasVocabularies: 빈 리스트면 false")
     void hasVocabularies_empty_returnsFalse() {
-        GenerationResult result = new GenerationResult("content", List.of(), List.of(), null);
+        GenerationResult result = new GenerationResult("content", List.of(), List.of(), null, null);
         assertThat(result.hasVocabularies()).isFalse();
     }
 
@@ -98,21 +98,21 @@ class GenerationResultTest {
     @DisplayName("hasQuizzes: 비어있지 않은 리스트면 true")
     void hasQuizzes_nonEmpty_returnsTrue() {
         var quiz = new GenerationResult.QuizData(QuizType.SHORT_ANSWER, "q?", new QuizOptions(null, null), "ans", "exp");
-        GenerationResult result = new GenerationResult("content", List.of(), List.of(quiz), null);
+        GenerationResult result = new GenerationResult("content", List.of(), List.of(quiz), null, null);
         assertThat(result.hasQuizzes()).isTrue();
     }
 
     @Test
     @DisplayName("hasQuizzes: null이면 false")
     void hasQuizzes_null_returnsFalse() {
-        GenerationResult result = new GenerationResult("content", List.of(), null, null);
+        GenerationResult result = new GenerationResult("content", List.of(), null, null, null);
         assertThat(result.hasQuizzes()).isFalse();
     }
 
     @Test
     @DisplayName("hasSourceDigest: digest가 있으면 true")
     void hasSourceDigest_returnsTrue() {
-        var digest = new GenerationResult.SourceDigestData("story", List.of(), List.of(), List.of());
+        var digest = new GenerationResult.SourceDigestData(null, "story", List.of(), List.of(), List.of());
         GenerationResult result = new GenerationResult("content", List.of(), List.of(), digest);
         assertThat(result.hasSourceDigest()).isTrue();
     }

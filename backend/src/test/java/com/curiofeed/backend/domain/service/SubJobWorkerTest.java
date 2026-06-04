@@ -74,9 +74,9 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
 
-        var result = new GenerationResult("content", List.of(), List.of(), null);
+        var result = new GenerationResult("content", List.of(), List.of(), null, null);
         when(primaryLlmClient.generate("prompt")).thenReturn("{}");
         when(responseParser.parse(eq("{}"), eq(GenerationResult.class))).thenReturn(result);
         when(validator.validate(result)).thenReturn(ValidationResult.pass(0.85));
@@ -96,10 +96,10 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
 
-        var primaryResult = new GenerationResult("short", List.of(), List.of(), null);
-        var fallbackResult = new GenerationResult("long content", List.of(), List.of(), null);
+        var primaryResult = new GenerationResult("short", List.of(), List.of(), null, null);
+        var fallbackResult = new GenerationResult("long content", List.of(), List.of(), null, null);
 
         when(primaryLlmClient.generate("prompt")).thenReturn("primary");
         when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);
@@ -123,10 +123,10 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
 
-        var primaryResult = new GenerationResult("content", List.of(), List.of(), null);
-        var fallbackResult = new GenerationResult("good content", List.of(), List.of(), null);
+        var primaryResult = new GenerationResult("content", List.of(), List.of(), null, null);
+        var fallbackResult = new GenerationResult("good content", List.of(), List.of(), null, null);
 
         when(primaryLlmClient.generate("prompt")).thenReturn("primary");
         when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);
@@ -150,7 +150,7 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("timeout"));
         when(fallbackLlmClient.generate("prompt")).thenThrow(new LlmClientException("timeout"));
 
@@ -167,7 +167,7 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenReturn("bad");
         when(responseParser.parse(eq("bad"), eq(GenerationResult.class)))
                 .thenThrow(new LlmParseException("bad json"));
@@ -222,7 +222,7 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.build(any(), any())).thenReturn("prompt");
+        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
         when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("fail"));
         when(fallbackLlmClient.generate("prompt")).thenThrow(new LlmClientException("fail"));
 
