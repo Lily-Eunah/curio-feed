@@ -47,12 +47,12 @@ function makeDetailDto(overrides: Partial<ArticleDetailDto> = {}): ArticleDetail
   return {
     id: 'a1',
     title: 'Test Article',
-    originalTitle: 'Original Title',
-    sourceName: 'Test Source',
+    sourceTitle: 'Original Title',
+    sourcePublisher: 'Test Source',
     sourceUrl: 'https://example.com',
     publishedAt: '2026-04-26T08:00:00Z',
-    originalPublishedAt: '2026-04-26T07:00:00Z',
-    createdAt: '2026-04-26T08:00:00Z',
+    sourcePublishedAt: '2026-04-26T07:00:00Z',
+    sourceAccessedAt: '2026-04-26T08:00:00Z',
     categoryName: 'Tech',
     availableLevels: ['EASY', 'MEDIUM'],
     content: {

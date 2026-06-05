@@ -391,7 +391,7 @@ export default function ArticleDetail({
                 />
 
                 {/* Source Citation & MVP Disclaimer */}
-                {(article.sourceName || article.sourceUrl) && (
+                {(article.sourcePublisher || article.sourceUrl) && (
                   <div style={{ marginTop: 32, padding: '16px 20px', background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: 13, color: COLORS.textSec, lineHeight: 1.5 }}>
                       This CurioFeed lesson is original English-learning content created from factual notes based on the source below.
@@ -400,13 +400,13 @@ export default function ArticleDetail({
                       Source:{' '}
                       {article.sourceUrl ? (
                         <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.accent, textDecoration: 'none' }}>
-                          {article.originalTitle || article.title}
+                          {article.sourceTitle || article.title}
                         </a>
                       ) : (
-                        <span>{article.originalTitle || article.title}</span>
+                        <span>{article.sourceTitle || article.title}</span>
                       )}
-                      {article.sourceName && ` - Published by ${article.sourceName}`}
-                      {article.originalPublishedAt && ` on ${formatDate(article.originalPublishedAt)}`}
+                      {article.sourcePublisher && ` - Published by ${article.sourcePublisher}`}
+                      {article.sourcePublishedAt && ` on ${formatDate(article.sourcePublishedAt)}`}
                     </p>
                   </div>
                 )}
