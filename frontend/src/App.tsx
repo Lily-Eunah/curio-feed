@@ -58,6 +58,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [toast, setToast] = useState({ message: '', visible: false });
   const loadingNextRef = useRef(false);
@@ -110,6 +111,25 @@ export default function App() {
     }
   }, [loadFeed, screen]);
 
+  const loadArticleDetail = useCallback(async (id: string) => {
+    const existing = articles.find(a => a.id === id);
+    if (!existing) return;
+    if (existing.body !== '') return; // already loaded
+
+    setLoadingDetail(true);
+    setDetailError(null);
+    const level = resolveAvailableLevel(appState.userLevel, existing.availableLevels);
+    try {
+      const detail = await fetchDetailWithFallback(id, level);
+      setArticles(prev => prev.map(a => a.id === id ? mapFullArticle(detail, a) : a));
+    } catch (err) {
+      console.error('Failed to fetch article detail:', err);
+      setDetailError('콘텐츠를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [articles, appState.userLevel]);
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
   const handleOnboardingComplete = useCallback((level: DifficultyLevel) => {
@@ -125,23 +145,13 @@ export default function App() {
       visitedIds: prev.visitedIds.includes(id) ? prev.visitedIds : [...prev.visitedIds, id],
     }));
 
-    // Fetch full detail if not already loaded (placeholder check)
-    const existing = articles.find(a => a.id === id);
-    if (existing && existing.body === '') {
-      const level = resolveAvailableLevel(appState.userLevel, existing.availableLevels);
-      try {
-        const detail = await fetchDetailWithFallback(id, level);
-        setArticles(prev => prev.map(a => a.id === id ? mapFullArticle(detail, a) : a));
-      } catch (err) {
-        console.error('Failed to fetch article detail:', err);
-        showToast('Failed to load article details');
-      }
-    }
-  }, [articles, appState.userLevel, setAppState, showToast]);
+    loadArticleDetail(id);
+  }, [setAppState, loadArticleDetail]);
 
   const handleBack = useCallback(() => {
     setCurrentArticleId(null);
     setScreen('feed');
+    setDetailError(null);
   }, []);
 
   const handleNavigate = useCallback((tab: Screen | 'me') => {
@@ -324,6 +334,8 @@ export default function App() {
             quizProgress={appState.quizProgress}
             continueReading={appState.continueReading}
             isLoading={loadingDetail}
+            error={detailError}
+            onRetry={() => loadArticleDetail(currentArticleId!)}
             onBack={handleBack}
             onSave={handleArticleSave}
             onQuizAnswer={handleQuizAnswer}
