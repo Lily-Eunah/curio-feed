@@ -46,12 +46,23 @@
    ```
 4. **환경변수 파일 작성**:
    * VM 내 `/opt/curiofeed/infra/` 경로에 `.env` 파일을 생성하고 내용을 채웁니다. (`.env.example` 파일 참조)
-5. **백엔드 배포 및 구동**:
-   * 배포 디렉토리에서 아래 명령어를 실행하여 컨테이너를 빌드하고 시작합니다.
+5. **백엔드 최초 배포 명령어 (순서대로 실행)**:
+   * 배포 디렉토리(`/opt/curiofeed/`)에서 아래 명령어를 **순서대로** 실행합니다.
      ```bash
+     # 1. 설정 유효성 검증 (컨테이너 실제 실행 전 dry-run)
+     docker compose -f infra/docker-compose.prod.yml config
+
+     # 2. 이미지 빌드 (최초 실행 또는 코드 변경 후)
      docker compose -f infra/docker-compose.prod.yml build
+
+     # 3. 컨테이너 백그라운드 실행
      docker compose -f infra/docker-compose.prod.yml up -d
+
+     # 4. 헬스체크 — "status":"UP" 응답이 나와야 정상
+     curl http://127.0.0.1:8080/actuator/health
      ```
+   * `config` 명령은 `.env` 변수 치환 및 YAML 파싱 오류를 실행 전에 미리 잡아줍니다.
+   * `curl` 응답이 `{"status":"UP"}` 이면 Flyway 마이그레이션 및 DB 연결 모두 정상입니다.
 
 ---
 

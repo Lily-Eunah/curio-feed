@@ -134,9 +134,9 @@ class ArticleFeedRepositoryTest {
         createArticle(category, ArticleStatus.DRAFT,
                 base.minusSeconds(7 * 3600L), "draft-2");
 
-        // HIDDEN article (1)
-        createArticle(category, ArticleStatus.HIDDEN,
-                base.minusSeconds(8 * 3600L), "hidden-1");
+        // ARCHIVED article (1) — must not appear in public feed
+        createArticle(category, ArticleStatus.ARCHIVED,
+                base.minusSeconds(8 * 3600L), "archived-1");
 
         em.flush();
         em.clear();

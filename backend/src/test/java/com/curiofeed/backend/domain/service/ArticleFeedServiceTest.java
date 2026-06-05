@@ -42,7 +42,7 @@ class ArticleFeedServiceTest {
                 .id(id)
                 .title("Test Article")
                 .categoryName("Technology")
-                .sourceName("Test Source")
+                .sourcePublisher("Test Source")
                 .publishedAt(publishedAt)
                 .estimatedReadingTime(0)
                 .build();

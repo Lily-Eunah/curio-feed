@@ -46,8 +46,8 @@ class ArticleDetailServiceTest {
         mockArticle = newInstance(Article.class);
         setField(mockArticle, "id", articleId);
         setField(mockArticle, "title", "Test Article");
-        setField(mockArticle, "originalTitle", "Original Title");
-        setField(mockArticle, "sourceName", "Test Source");
+        setField(mockArticle, "sourceTitle", "Original Title");
+        setField(mockArticle, "sourcePublisher", "Test Source");
         setField(mockArticle, "sourceUrl", "http://test.com");
         setField(mockArticle, "publishedAt", Instant.now());
         setField(mockArticle, "status", ArticleStatus.PUBLISHED);

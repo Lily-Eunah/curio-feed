@@ -76,7 +76,7 @@ class GenerationResultTest {
     @DisplayName("hasVocabularies: 비어있지 않은 리스트면 true")
     void hasVocabularies_nonEmpty_returnsTrue() {
         var vocab = new GenerationResult.VocabularyData("word", "def", "example");
-        GenerationResult result = new GenerationResult("content", List.of(vocab), List.of(), null);
+        GenerationResult result = new GenerationResult("content", List.of(), List.of(vocab), List.of(), null);
         assertThat(result.hasVocabularies()).isTrue();
     }
 
@@ -98,7 +98,7 @@ class GenerationResultTest {
     @DisplayName("hasQuizzes: 비어있지 않은 리스트면 true")
     void hasQuizzes_nonEmpty_returnsTrue() {
         var quiz = new GenerationResult.QuizData(QuizType.SHORT_ANSWER, "q?", new QuizOptions(null, null), "ans", "exp");
-        GenerationResult result = new GenerationResult("content", List.of(), List.of(quiz), null, null);
+        GenerationResult result = new GenerationResult("content", List.of(), List.of(), List.of(quiz), null);
         assertThat(result.hasQuizzes()).isTrue();
     }
 
@@ -113,7 +113,7 @@ class GenerationResultTest {
     @DisplayName("hasSourceDigest: digest가 있으면 true")
     void hasSourceDigest_returnsTrue() {
         var digest = new GenerationResult.SourceDigestData(null, "story", List.of(), List.of(), List.of());
-        GenerationResult result = new GenerationResult("content", List.of(), List.of(), digest);
+        GenerationResult result = new GenerationResult("content", List.of(), List.of(), List.of(), digest);
         assertThat(result.hasSourceDigest()).isTrue();
     }
 

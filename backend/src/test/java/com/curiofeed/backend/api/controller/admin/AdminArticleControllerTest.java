@@ -354,8 +354,8 @@ class AdminArticleControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/admin/articles/{id}/status - PUBLISHED → HIDDEN 성공")
-    void updateStatus_publishedToHidden() throws Exception {
+    @DisplayName("PATCH /api/admin/articles/{id}/status - PUBLISHED → ARCHIVED 성공")
+    void updateStatus_publishedToArchived() throws Exception {
         String articleId = createArticleAndGetId();
 
         // First: DRAFT → PUBLISHED
@@ -365,20 +365,20 @@ class AdminArticleControllerTest {
                 .andExpect(status().isOk());
         em.flush(); em.clear();
 
-        // Then: PUBLISHED → HIDDEN
+        // Then: PUBLISHED → ARCHIVED
         mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusJson("HIDDEN")))
+                        .content(statusJson("ARCHIVED")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("HIDDEN"));
+                .andExpect(jsonPath("$.status").value("ARCHIVED"));
     }
 
     @Test
-    @DisplayName("PATCH /api/admin/articles/{id}/status - HIDDEN → PUBLISHED 복원")
-    void updateStatus_hiddenToPublished() throws Exception {
+    @DisplayName("PATCH /api/admin/articles/{id}/status - ARCHIVED → PUBLISHED 복원")
+    void updateStatus_archivedToPublished() throws Exception {
         String articleId = createArticleAndGetId();
 
-        // DRAFT → PUBLISHED → HIDDEN
+        // DRAFT → PUBLISHED → ARCHIVED
         mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusJson("PUBLISHED")))
@@ -387,11 +387,11 @@ class AdminArticleControllerTest {
 
         mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusJson("HIDDEN")))
+                        .content(statusJson("ARCHIVED")))
                 .andExpect(status().isOk());
         em.flush(); em.clear();
 
-        // HIDDEN → PUBLISHED
+        // ARCHIVED → PUBLISHED
         mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(statusJson("PUBLISHED")))
@@ -400,13 +400,13 @@ class AdminArticleControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/admin/articles/{id}/status - 허용되지 않는 전환 (DRAFT → HIDDEN): 400")
+    @DisplayName("PATCH /api/admin/articles/{id}/status - 허용되지 않는 전환 (DRAFT → ARCHIVED): 400")
     void updateStatus_invalidTransition() throws Exception {
         String articleId = createArticleAndGetId();
 
         mockMvc.perform(patch("/api/admin/articles/{id}/status", articleId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(statusJson("HIDDEN")))
+                        .content(statusJson("ARCHIVED")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid status transition")));
     }
