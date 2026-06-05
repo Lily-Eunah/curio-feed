@@ -75,8 +75,8 @@ class GenerationResultSaverTest {
         em.persist(category);
 
         article = newInstance(Article.class);
-        setField(article, "originalTitle", "Test Article");
-        setField(article, "sourceName", "Test Source");
+        setField(article, "sourceTitle", "Test Article");
+        setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + UUID.randomUUID());
         setField(article, "originalPublishedAt", Instant.now());
         setField(article, "title", "Test Article");

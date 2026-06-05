@@ -4,6 +4,7 @@ import com.curiofeed.backend.api.dto.ArticleDetailResponse;
 import com.curiofeed.backend.api.dto.ArticleFeedResponse;
 import com.curiofeed.backend.api.dto.CursorPageResponse;
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
+import com.curiofeed.backend.domain.service.ArticleAudioService;
 import com.curiofeed.backend.domain.service.ArticleDetailService;
 import com.curiofeed.backend.domain.service.ArticleFeedService;
 import jakarta.persistence.EntityNotFoundException;
@@ -38,6 +39,9 @@ class ArticleControllerTest {
 
     @MockBean
     private ArticleFeedService feedService;
+
+    @MockBean
+    private ArticleAudioService audioService;
 
     @Test
     @DisplayName("피드 조회 시 성공 응답을 반환한다")

@@ -63,8 +63,8 @@ class QuizRepositoryTest {
 
         // Article
         Article article = newInstance(Article.class);
-        setField(article, "originalTitle", "Original");
-        setField(article, "sourceName", "Source");
+        setField(article, "sourceTitle", "Original");
+        setField(article, "sourcePublisher", "Source");
         setField(article, "sourceUrl", "http://example.com");
         setField(article, "originalPublishedAt", Instant.now());
         setField(article, "title", "Title");

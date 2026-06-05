@@ -60,8 +60,8 @@ class ArticleFeedRepositoryTest {
 
     private Article createArticle(Category cat, ArticleStatus status, Instant publishedAt, String slug) {
         Article article = newInstance(Article.class);
-        setField(article, "originalTitle", "Original: " + slug);
-        setField(article, "sourceName", "Test Source");
+        setField(article, "sourceTitle", "Original: " + slug);
+        setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + slug);
         setField(article, "originalPublishedAt", publishedAt);
         setField(article, "title", "Title: " + slug);
