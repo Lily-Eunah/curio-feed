@@ -114,7 +114,7 @@ describe('ArticleDetailPage', () => {
       renderPage();
       await waitFor(() => {
         expect(screen.getByText('article-abc')).toBeInTheDocument();
-        expect(screen.getByText(/reviewing/i)).toBeInTheDocument();
+        expect(screen.getByText(/draft/i)).toBeInTheDocument();
         expect(screen.getByText('job-xyz')).toBeInTheDocument();
       });
     });

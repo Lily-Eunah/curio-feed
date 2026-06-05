@@ -68,8 +68,6 @@ export default function ArticleDetail({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const audioUrl = `/api/articles/${articleId}/content/${currentLevel}/audio`;
-
   // Pause audio when level changes or component unmounts
   useEffect(() => {
     return () => {

@@ -58,7 +58,7 @@ describe('GenerationStatusPage', () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('article-123')).toBeInTheDocument();
-      expect(screen.getByText(/reviewing/i)).toBeInTheDocument();
+      expect(screen.getByText(/draft/i)).toBeInTheDocument();
       expect(screen.getByText('job-456')).toBeInTheDocument();
     });
   });
