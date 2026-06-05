@@ -45,13 +45,6 @@ describe('StatusBadge', () => {
     expect(badge.className).toMatch(/gray/);
   });
 
-  it('renders REVIEWING with orange styling', () => {
-    render(<StatusBadge status="REVIEWING" />);
-    const badge = screen.getByText('Reviewing');
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toMatch(/orange/);
-  });
-
   it('renders PUBLISHED with green styling', () => {
     render(<StatusBadge status="PUBLISHED" />);
     const badge = screen.getByText('Published');
@@ -59,25 +52,11 @@ describe('StatusBadge', () => {
     expect(badge.className).toMatch(/green/);
   });
 
-  it('renders HIDDEN with gray styling', () => {
-    render(<StatusBadge status="HIDDEN" />);
-    const badge = screen.getByText('Hidden');
+  it('renders ARCHIVED with gray styling', () => {
+    render(<StatusBadge status="ARCHIVED" />);
+    const badge = screen.getByText('Archived');
     expect(badge).toBeInTheDocument();
     expect(badge.className).toMatch(/gray/);
-  });
-
-  it('renders READY with purple styling', () => {
-    render(<StatusBadge status="READY" />);
-    const badge = screen.getByText('Ready');
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toMatch(/purple/);
-  });
-
-  it('renders STALE with amber/warning styling', () => {
-    render(<StatusBadge status="STALE" />);
-    const badge = screen.getByText('Stale');
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toMatch(/amber/);
   });
 
   it('falls back to raw status string for unknown status', () => {

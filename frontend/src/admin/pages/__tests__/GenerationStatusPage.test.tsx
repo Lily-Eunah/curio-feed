@@ -25,7 +25,7 @@ function renderPage(articleId = 'article-123') {
 
 const mockStatus: GenerationStatusResponse = {
   articleId: 'article-123',
-  articleStatus: 'REVIEWING',
+  articleStatus: 'DRAFT',
   job: {
     jobId: 'job-456',
     subJobs: [

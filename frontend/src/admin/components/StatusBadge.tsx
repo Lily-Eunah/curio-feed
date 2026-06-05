@@ -5,11 +5,8 @@ export type StatusType =
   | 'COMPLETED'
   | 'FAILED'
   | 'DRAFT'
-  | 'REVIEWING'
   | 'PUBLISHED'
-  | 'HIDDEN'
-  | 'READY'
-  | 'STALE'
+  | 'ARCHIVED'
   | 'SKIPPED';
 
 interface StatusConfig {
@@ -24,11 +21,8 @@ const STATUS_CONFIG: Record<StatusType, StatusConfig> = {
   COMPLETED: { label: 'Completed', className: 'bg-green-100 text-green-700' },
   FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700' },
   DRAFT: { label: 'Draft', className: 'bg-gray-100 text-gray-700' },
-  REVIEWING: { label: 'Reviewing', className: 'bg-orange-100 text-orange-700' },
   PUBLISHED: { label: 'Published', className: 'bg-green-100 text-green-700' },
-  HIDDEN: { label: 'Hidden', className: 'bg-gray-100 text-gray-700' },
-  READY: { label: 'Ready', className: 'bg-purple-100 text-purple-700' },
-  STALE: { label: 'Stale', className: 'bg-amber-100 text-amber-700' },
+  ARCHIVED: { label: 'Archived', className: 'bg-gray-100 text-gray-500' },
   SKIPPED: { label: 'Skipped', className: 'bg-gray-100 text-gray-400' },
 };
 
