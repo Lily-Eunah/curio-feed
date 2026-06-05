@@ -100,6 +100,21 @@ curl http://127.0.0.1:8080/actuator/health
 
 ---
 
+## 5. Oracle VM 아키텍처 호환성
+
+Oracle Cloud Always Free VM은 **AMD (x86_64)** 또는 **ARM Ampere A1 (aarch64)** 인스턴스를 선택할 수 있습니다.
+
+백엔드 `Dockerfile`은 `eclipse-temurin:21-jdk-alpine` 및 `eclipse-temurin:21-jre-alpine` 이미지를 기반으로 합니다. Eclipse Temurin Java 21 이미지는 **multi-arch 이미지**로 제공되어 `linux/amd64`와 `linux/arm64` 모두 지원합니다. Oracle ARM 인스턴스에서도 별도 설정 없이 `docker compose build` 및 실행이 가능합니다.
+
+단, 아래 조건에 해당하는 경우 추가 확인이 필요합니다:
+
+* JNI(Java Native Interface)를 사용하는 라이브러리가 의존성에 포함된 경우
+* native binary가 포함된 third-party JAR을 사용하는 경우
+
+현재 백엔드는 PostgreSQL JDBC, Spring Boot, Flyway 등 순수 JVM 기반 라이브러리만 사용하므로 ARM 호환 문제는 없습니다.
+
+---
+
 ## ⛔ 금지 및 주의사항
 
 * 도메인 연결 설정(`api.curiofeed.com`)을 아직 구매하지 않은 상태에서 강제로 Caddy에 주입하거나 DNS 설정을 시도하지 마세요. (인증서 발급에 연속 실패하여 IP 차단 등의 제재를 받을 수 있습니다.)
