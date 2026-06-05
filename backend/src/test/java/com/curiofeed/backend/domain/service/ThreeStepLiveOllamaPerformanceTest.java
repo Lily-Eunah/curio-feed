@@ -3,6 +3,7 @@ package com.curiofeed.backend.domain.service;
 import com.curiofeed.backend.domain.entity.*;
 import com.curiofeed.backend.domain.repository.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Tag("ollama")
 @EnabledIfEnvironmentVariable(named = "RUN_LIVE_OLLAMA_TESTS", matches = "true")
 class ThreeStepLiveOllamaPerformanceTest {
 

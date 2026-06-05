@@ -130,3 +130,72 @@ Oracle Cloud Always Free VM은 **AMD (x86_64)** 또는 **ARM Ampere A1 (aarch64)
 
 * 도메인 연결 설정(`api.curiofeed.com`)을 아직 구매하지 않은 상태에서 강제로 Caddy에 주입하거나 DNS 설정을 시도하지 마세요. (인증서 발급에 연속 실패하여 IP 차단 등의 제재를 받을 수 있습니다.)
 * `.env` 파일을 로컬 또는 원격 Git 저장소에 푸시(Commit)하지 않도록 항시 검증하십시오.
+
+---
+
+## 테스트 전략
+
+### 기본 build (`./gradlew build`)
+
+기본 build에서는 **외부 LLM API를 호출하는 테스트를 실행하지 않습니다.**
+
+포함:
+- 단위 테스트 (unit test)
+- 리포지토리 테스트 (Testcontainers + PostgreSQL)
+- 컨트롤러 테스트 (MockMvc)
+- mock/stub 기반 서비스 테스트
+
+제외 (JUnit 5 tag 기반):
+- `ollama` — Ollama legacy 외부 테스트
+- `gemini` — Gemini 실제 API 호출 테스트
+- `external` — 외부 서비스 의존 테스트
+- `pending` — 아직 구현되지 않은 behavior를 검증하는 테스트
+
+### Ollama 테스트
+
+CurioFeed는 더 이상 Ollama를 사용하지 않습니다. 기사 생성 파이프라인은 **Gemini Free Tier API**로 전환되었습니다.
+
+Ollama 테스트는 legacy external test로 보존되어 있으며, 기본 build에서는 실행되지 않습니다.
+
+필요 시 수동 실행:
+```bash
+# Git Bash
+RUN_OLLAMA_TESTS=true ./gradlew ollamaTest
+
+# PowerShell
+$env:RUN_OLLAMA_TESTS="true"; .\gradlew.bat ollamaTest
+```
+
+### Gemini API 테스트
+
+실제 Gemini API를 호출하는 테스트는 기본 build에서 제외됩니다.
+이유: Free Tier quota 소진 방지, 네트워크 불안정으로 인한 build 실패 방지, API key 없는 환경에서도 build 통과 보장.
+
+LLM 서비스는 mock/stub 기반으로 단위 테스트합니다.
+
+Gemini 실제 API 호출이 필요할 때:
+```bash
+# GEMINI_API_KEY 환경변수 필요
+./gradlew geminiIntegrationTest
+```
+
+### 환경변수 (API Key)
+
+| 변수명 | 설명 | 설정 위치 |
+|---|---|---|
+| `GEMINI_API_KEY` | Gemini Free Tier API 키 | 운영 VM `infra/.env` |
+| `TTS_API_KEY` | Google Cloud TTS API 키 | 운영 VM `infra/.env` |
+
+`.env.example`에는 placeholder만 두고, 실제 키는 절대 Git에 커밋하지 않습니다.
+
+### 재활성화 대기 테스트
+
+`ThreeStepPipelineIntegrationTest`의 2개 테스트는 `@Tag("pending")`으로 기본 build에서 제외됩니다.
+
+```
+- process_fullExecution_reportsDurations
+- process_llmFailure_transitionsToFailed
+```
+
+이 테스트들은 `SHORT_ARTICLE/SKIPPED` pipeline behavior를 기대하지만, 해당 로직이 아직 프로덕션 코드에 구현되지 않았습니다.
+**재활성화 조건:** `ThreeStepSubJobWorker`에 SHORT_ARTICLE SKIPPED 로직 구현 후 `@Tag("pending")` 제거.
