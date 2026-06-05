@@ -63,7 +63,7 @@ class ArticleFeedRepositoryTest {
         setField(article, "sourceTitle", "Original: " + slug);
         setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + slug);
-        setField(article, "originalPublishedAt", publishedAt);
+        setField(article, "sourcePublishedAt", publishedAt);
         setField(article, "title", "Title: " + slug);
         setField(article, "slug", slug);
         setField(article, "category", cat);

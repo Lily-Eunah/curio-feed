@@ -78,7 +78,7 @@ class GenerationResultSaverTest {
         setField(article, "sourceTitle", "Test Article");
         setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + UUID.randomUUID());
-        setField(article, "originalPublishedAt", Instant.now());
+        setField(article, "sourcePublishedAt", Instant.now());
         setField(article, "title", "Test Article");
         setField(article, "slug", "test-article-" + UUID.randomUUID());
         setField(article, "category", category);

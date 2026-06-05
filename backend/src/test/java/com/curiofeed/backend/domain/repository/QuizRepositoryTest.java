@@ -66,7 +66,7 @@ class QuizRepositoryTest {
         setField(article, "sourceTitle", "Original");
         setField(article, "sourcePublisher", "Source");
         setField(article, "sourceUrl", "http://example.com");
-        setField(article, "originalPublishedAt", Instant.now());
+        setField(article, "sourcePublishedAt", Instant.now());
         setField(article, "title", "Title");
         setField(article, "slug", "slug-test-quiz");
         setField(article, "category", category);

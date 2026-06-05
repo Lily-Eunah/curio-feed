@@ -65,7 +65,7 @@ class ArticleDetailRepositoryTest {
         setField(published, "sourceTitle", "Original Title");
         setField(published, "sourcePublisher", "Test Source");
         setField(published, "sourceUrl", "https://example.com/article");
-        setField(published, "originalPublishedAt", Instant.now());
+        setField(published, "sourcePublishedAt", Instant.now());
         setField(published, "title", "Published Article");
         setField(published, "slug", "published-article");
         setField(published, "category", category);
@@ -119,7 +119,7 @@ class ArticleDetailRepositoryTest {
         setField(draft, "sourceTitle", "Draft Original");
         setField(draft, "sourcePublisher", "Test Source");
         setField(draft, "sourceUrl", "https://example.com/draft");
-        setField(draft, "originalPublishedAt", Instant.now());
+        setField(draft, "sourcePublishedAt", Instant.now());
         setField(draft, "title", "Draft Article");
         setField(draft, "slug", "draft-article");
         setField(draft, "category", category);
