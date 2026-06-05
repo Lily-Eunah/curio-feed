@@ -338,6 +338,25 @@ export default function ArticleDetail({
               bodyRef={bodyRef}
             />
 
+            {/* Source Citation & MVP Disclaimer */}
+            {(article.sourceName || article.sourceUrl) && (
+              <div style={{ marginTop: 32, padding: '16px 20px', background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: 13, color: COLORS.textSec, lineHeight: 1.5 }}>
+                  This CurioFeed lesson is an original English-learning article created from factual notes based on the source below.
+                </p>
+                <p style={{ margin: 0, fontSize: 13, color: COLORS.textSec, lineHeight: 1.5 }}>
+                  Original source: {' '}
+                  {article.sourceUrl ? (
+                    <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.accent, textDecoration: 'none' }}>
+                      {article.sourceName} - {article.originalTitle || article.title}
+                    </a>
+                  ) : (
+                    <span>{article.sourceName} - {article.originalTitle || article.title}</span>
+                  )}
+                </p>
+              </div>
+            )}
+
             {/* Vocab tap hint */}
             <div
               style={{
