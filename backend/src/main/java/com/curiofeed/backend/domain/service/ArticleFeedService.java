@@ -70,7 +70,7 @@ public class ArticleFeedService {
                         a.getTitle(),
                         TextSanitizer.sanitizeForPreview(a.getOriginalContent(), 200),
                         a.getCategory().getDisplayName(),
-                        a.getSourceName(),
+                        a.getSourcePublisher(),
                         a.getPublishedAt(),
                         readingMinutes(a.getOriginalContent(), DifficultyLevel.MEDIUM) // Fallback for bulk get (not level specific)
                 ))
@@ -86,7 +86,7 @@ public class ArticleFeedService {
                 .title(r.getTitle())
                 .excerpt(sanitized)
                 .categoryName(r.getCategoryName())
-                .sourceName(r.getSourceName())
+                .sourcePublisher(r.getSourcePublisher())
                 .publishedAt(r.getPublishedAt())
                 .estimatedReadingTime(readingMinutes(r.getExcerpt(), level))
                 .build();

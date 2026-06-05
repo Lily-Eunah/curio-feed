@@ -17,7 +17,7 @@ public class ArticleFeedResponse {
     private String title;
     private String excerpt;
     private String categoryName;
-    private String sourceName;
+    private String sourcePublisher;
     private Instant publishedAt;
     private int estimatedReadingTime; // in minutes
 }

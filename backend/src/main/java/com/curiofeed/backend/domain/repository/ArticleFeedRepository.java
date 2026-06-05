@@ -19,14 +19,14 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
             a.title, 
             COALESCE(ac.content, a.originalContent),
             c.displayName, 
-            a.sourceName, 
-            a.publishedAt, 
+            a.sourcePublisher,
+            a.publishedAt,
             0
         )
         FROM Article a
         JOIN a.category c
         LEFT JOIN ArticleContent ac ON ac.article = a AND ac.level = :level
-        WHERE a.status = :status 
+        WHERE a.status = :status
         AND (a.publishedAt < :cursorAt OR (a.publishedAt = :cursorAt AND a.id < :cursorId))
         ORDER BY a.publishedAt DESC, a.id DESC
     """)
@@ -43,15 +43,15 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
             CAST(a.id AS string), 
             a.title, 
             COALESCE(ac.content, a.originalContent),
-            c.displayName, 
-            a.sourceName, 
+            c.displayName,
+            a.sourcePublisher,
             a.publishedAt,
             0
         )
         FROM Article a
         JOIN a.category c
         LEFT JOIN ArticleContent ac ON ac.article = a AND ac.level = :level
-        WHERE a.status = :status 
+        WHERE a.status = :status
         ORDER BY a.publishedAt DESC, a.id DESC
     """)
     List<ArticleFeedResponse> findFeedFirstPage(

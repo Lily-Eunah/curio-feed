@@ -32,17 +32,17 @@ public class Article extends BaseEntity {
     @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
-    @Column(nullable = false, length = 500)
-    private String originalTitle;
+    @Column(name = "original_title", nullable = false, length = 500)
+    private String sourceTitle;
 
-    @Column(nullable = false)
-    private String sourceName;
+    @Column(name = "source_name", nullable = false)
+    private String sourcePublisher;
 
     @Column(nullable = false, unique = true, columnDefinition = "TEXT")
     private String sourceUrl;
 
-    @Column(nullable = false)
-    private Instant originalPublishedAt;
+    @Column(name = "original_published_at", nullable = false)
+    private Instant sourcePublishedAt;
 
     @Column(nullable = false, length = 500)
     private String title;
@@ -74,26 +74,30 @@ public class Article extends BaseEntity {
     private List<ArticleContent> contents = new ArrayList<>();
 
     public static Article create(
-            String originalTitle,
-            String sourceName,
+            String sourceTitle,
+            String sourcePublisher,
             String sourceUrl,
             String originalContent,
-            Instant originalPublishedAt,
+            Instant sourcePublishedAt,
             Category category,
             String slug
     ) {
         Article article = new Article();
-        article.originalTitle = originalTitle;
-        article.sourceName = sourceName;
+        article.sourceTitle = sourceTitle;
+        article.sourcePublisher = sourcePublisher;
         article.sourceUrl = sourceUrl;
         article.originalContent = originalContent;
-        article.originalPublishedAt = originalPublishedAt;
-        article.title = originalTitle;
+        article.sourcePublishedAt = sourcePublishedAt;
+        article.title = sourceTitle;
         article.slug = slug;
         article.category = category;
-        article.publishedAt = originalPublishedAt;
+        article.publishedAt = sourcePublishedAt;
         article.status = ArticleStatus.DRAFT;
         return article;
+    }
+
+    public Instant getSourceAccessedAt() {
+        return getCreatedAt();
     }
 
     public void updateStatus(ArticleStatus newStatus) {

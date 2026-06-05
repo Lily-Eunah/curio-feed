@@ -67,8 +67,8 @@ public class AdminArticleController {
             result = articleRepository.findAllByStatus(articleStatus, pageable)
                     .map(article -> new AdminArticleListResponse(
                             article.getId(),
-                            article.getOriginalTitle(),
-                            article.getSourceName(),
+                            article.getSourceTitle(),
+                            article.getSourcePublisher(),
                             article.getStatus().name(),
                             article.getCategory().getDisplayName(),
                             article.getCreatedAt()));
@@ -76,8 +76,8 @@ public class AdminArticleController {
             result = articleRepository.findAll(pageable)
                     .map(article -> new AdminArticleListResponse(
                             article.getId(),
-                            article.getOriginalTitle(),
-                            article.getSourceName(),
+                            article.getSourceTitle(),
+                            article.getSourcePublisher(),
                             article.getStatus().name(),
                             article.getCategory().getDisplayName(),
                             article.getCreatedAt()));
@@ -125,8 +125,8 @@ public class AdminArticleController {
                             article.getId(),
                             article.getStatus(),
                             article.getTitle(),
-                            article.getOriginalTitle(),
-                            article.getSourceName(),
+                            article.getSourceTitle(),
+                            article.getSourcePublisher(),
                             article.getSourceUrl(),
                             article.getCategory() != null ? article.getCategory().getId().toString() : null,
                             article.getCategory() != null ? article.getCategory().getDisplayName() : null,
@@ -248,9 +248,8 @@ public class AdminArticleController {
 
     private static final java.util.Set<Transition> ALLOWED_TRANSITIONS = java.util.Set.of(
             new Transition(ArticleStatus.DRAFT, ArticleStatus.PUBLISHED),
-            new Transition(ArticleStatus.REVIEWING, ArticleStatus.PUBLISHED),
-            new Transition(ArticleStatus.PUBLISHED, ArticleStatus.HIDDEN),
-            new Transition(ArticleStatus.HIDDEN, ArticleStatus.PUBLISHED)
+            new Transition(ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED),
+            new Transition(ArticleStatus.ARCHIVED, ArticleStatus.PUBLISHED)
     );
 
     /**
