@@ -12,6 +12,7 @@ import VocabReview from './VocabReview';
 import SaveButton from './SaveButton';
 import QuizSection from './quiz/QuizSection';
 import NextArticleCard from './NextArticleCard';
+import { formatDate } from '../../utils/article';
 
 interface Props {
   article: Article;
@@ -258,76 +259,91 @@ export default function ArticleDetail({
               {article.title}
             </h1>
 
-            {/* Native Audio Element */}
+            {/* Native Audio Element & Controls */}
             <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              preload="auto"
-              onWaiting={() => setIsLoadingAudio(true)}
-              onPlaying={() => setIsLoadingAudio(false)}
-              onCanPlay={() => setIsLoadingAudio(false)}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-              onError={() => { console.error("Failed to load audio"); setIsLoadingAudio(false); }}
-            />
-
-            {/* TTS Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: COLORS.bg, padding: '12px 16px', borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
-              {/* Play / Pause button */}
-              <button
-                onClick={!isPlaying ? handlePlay : handlePause}
-                style={{
-                  background: COLORS.accent,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: 36,
-                  height: 36,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: isLoadingAudio ? 'wait' : 'pointer',
-                  flexShrink: 0
-                }}
-                disabled={isLoadingAudio}
-                aria-label={isLoadingAudio ? "Loading audio" : !isPlaying ? "Play article audio" : "Pause article audio"}
-              >
-                {isLoadingAudio ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
-                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                  </svg>
-                ) : !isPlaying ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                )}
-              </button>
-
-              {/* Progress Bar & Time */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input
-                  type="range"
-                  min="0"
-                  max={duration || 100}
-                  step="0.1"
-                  value={currentTime}
-                  onChange={handleSeek}
-                  style={{
-                    flex: 1,
-                    cursor: isLoadingAudio || duration === 0 ? 'not-allowed' : 'pointer',
-                    accentColor: COLORS.accent
-                  }}
-                  disabled={isLoadingAudio || duration === 0}
+            {article.audioUrl ? (
+              <>
+                <audio
+                  ref={audioRef}
+                  src={article.audioUrl}
+                  preload="auto"
+                  onWaiting={() => setIsLoadingAudio(true)}
+                  onPlaying={() => setIsLoadingAudio(false)}
+                  onCanPlay={() => setIsLoadingAudio(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                  onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                  onError={() => { console.error("Failed to load audio"); setIsLoadingAudio(false); }}
                 />
-                <div style={{ fontSize: 12, color: COLORS.textSec, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                  {duration === 0 || isLoadingAudio ? "--:--" : formatTime(currentTime)} / {duration === 0 ? "--:--" : formatTime(duration)}
+
+                {/* TTS Controls */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: COLORS.bg, padding: '12px 16px', borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
+                  {/* Play / Pause button */}
+                  <button
+                    onClick={!isPlaying ? handlePlay : handlePause}
+                    style={{
+                      background: COLORS.accent,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: 36,
+                      height: 36,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: isLoadingAudio ? 'wait' : 'pointer',
+                      flexShrink: 0
+                    }}
+                    disabled={isLoadingAudio}
+                    aria-label={isLoadingAudio ? "Loading audio" : !isPlaying ? "Play article audio" : "Pause article audio"}
+                  >
+                    {isLoadingAudio ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                      </svg>
+                    ) : !isPlaying ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    )}
+                  </button>
+
+                  {/* Progress Bar & Time */}
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max={duration || 100}
+                      step="0.1"
+                      value={currentTime}
+                      onChange={handleSeek}
+                      style={{
+                        flex: 1,
+                        cursor: isLoadingAudio || duration === 0 ? 'not-allowed' : 'pointer',
+                        accentColor: COLORS.accent
+                      }}
+                      disabled={isLoadingAudio || duration === 0}
+                    />
+                    <div style={{ fontSize: 12, color: COLORS.textSec, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      {duration === 0 || isLoadingAudio ? "--:--" : formatTime(currentTime)} / {duration === 0 ? "--:--" : formatTime(duration)}
+                    </div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div style={{ marginBottom: 20, padding: '12px 16px', borderRadius: 12, border: `1px dashed ${COLORS.borderLight}`, background: COLORS.bg, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.textTer} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span style={{ fontSize: 13, color: COLORS.textTer, fontWeight: 500 }}>
+                  Audio will be available soon
+                </span>
               </div>
-            </div>
+            )}
 
             {/* Article body (scroll-tracked) */}
             <ArticleBody
@@ -342,17 +358,19 @@ export default function ArticleDetail({
             {(article.sourceName || article.sourceUrl) && (
               <div style={{ marginTop: 32, padding: '16px 20px', background: COLORS.bg, borderRadius: 12, border: `1px solid ${COLORS.borderLight}` }}>
                 <p style={{ margin: '0 0 8px 0', fontSize: 13, color: COLORS.textSec, lineHeight: 1.5 }}>
-                  This CurioFeed lesson is an original English-learning article created from factual notes based on the source below.
+                  This CurioFeed lesson is original English-learning content created from factual notes based on the source below.
                 </p>
                 <p style={{ margin: 0, fontSize: 13, color: COLORS.textSec, lineHeight: 1.5 }}>
-                  Original source: {' '}
+                  Source:{' '}
                   {article.sourceUrl ? (
                     <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.accent, textDecoration: 'none' }}>
-                      {article.sourceName} - {article.originalTitle || article.title}
+                      {article.originalTitle || article.title}
                     </a>
                   ) : (
-                    <span>{article.sourceName} - {article.originalTitle || article.title}</span>
+                    <span>{article.originalTitle || article.title}</span>
                   )}
+                  {article.sourceName && ` - Published by ${article.sourceName}`}
+                  {article.originalPublishedAt && ` on ${formatDate(article.originalPublishedAt)}`}
                 </p>
               </div>
             )}

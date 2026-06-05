@@ -46,6 +46,8 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
                 .sourceName(article.getSourceName())
                 .sourceUrl(article.getSourceUrl())
                 .publishedAt(article.getPublishedAt())
+                .originalPublishedAt(article.getOriginalPublishedAt())
+                .createdAt(article.getCreatedAt())
                 .categoryName(article.getCategory().getDisplayName())
                 .availableLevels(availableLevels)
                 .content(mapContent(targetContent))

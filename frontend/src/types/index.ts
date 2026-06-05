@@ -34,6 +34,9 @@ export interface Article {
   originalTitle?: string;
   sourceName?: string;
   sourceUrl?: string;
+  originalPublishedAt?: string;
+  createdAt?: string;
+  audioUrl?: string | null;
   excerpt: string;
   vocabulary: VocabEntry[];
   body: string;

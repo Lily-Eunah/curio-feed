@@ -116,7 +116,7 @@ export function mapDetailDtoToArticle(dto: ArticleDetailDto): MappedArticle {
 
 // ── App-level mapping (returns full Article type for Feed/ArticleDetail components) ──
 
-function formatDate(iso: string): string {
+export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
@@ -211,6 +211,9 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     originalTitle: dto.originalTitle,
     sourceName: dto.sourceName,
     sourceUrl: dto.sourceUrl,
+    originalPublishedAt: dto.originalPublishedAt,
+    createdAt: dto.createdAt,
+    audioUrl: dto.content.audioUrl,
     excerpt: feedArticle?.excerpt ?? '',
     vocabulary: dto.content.vocabularies.map((v) => ({
       word: v.word,

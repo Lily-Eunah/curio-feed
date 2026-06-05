@@ -18,6 +18,8 @@ public record ArticleDetailResponse(
     String sourceName,
     String sourceUrl,
     Instant publishedAt,
+    Instant originalPublishedAt,
+    Instant createdAt,
     String categoryName,
     List<DifficultyLevel> availableLevels,
     ArticleContentDto content

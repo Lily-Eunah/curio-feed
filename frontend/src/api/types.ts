@@ -23,6 +23,8 @@ export interface ArticleDetailDto {
   sourceName: string;
   sourceUrl: string;
   publishedAt: string;
+  originalPublishedAt: string;
+  createdAt: string;
   categoryName: string;
   availableLevels: DifficultyLevel[];
   content: ArticleContentDto;
