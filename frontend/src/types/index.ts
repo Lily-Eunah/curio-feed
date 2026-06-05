@@ -31,6 +31,9 @@ export interface Article {
   date: string;
   readTime: string;
   title: string;
+  originalTitle?: string;
+  sourceName?: string;
+  sourceUrl?: string;
   excerpt: string;
   vocabulary: VocabEntry[];
   body: string;
