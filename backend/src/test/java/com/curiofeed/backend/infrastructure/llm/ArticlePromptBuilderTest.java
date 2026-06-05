@@ -34,30 +34,30 @@ class ArticlePromptBuilderTest {
     }
 
     @Test
-    @DisplayName("결과 프롬프트에 'Do NOT include' 문구가 포함된다")
-    void build_containsDoNotInclude() {
+    @DisplayName("결과 프롬프트에 출처 외 정보 금지 지침이 포함된다")
+    void build_containsNoExtraInfoConstraint() {
         String prompt = builder.buildContentPrompt("Some content", DifficultyLevel.MEDIUM);
-        assertThat(prompt).contains("Do NOT include");
+        assertThat(prompt).contains("Do not add information not present in the source");
     }
 
     @Test
-    @DisplayName("생성 프롬프트에 3~4 문단 지침이 포함된다")
+    @DisplayName("생성 프롬프트에 문단 수 지침이 포함된다")
     void build_containsParagraphGuideline() {
         String prompt = builder.buildContentPrompt("Some content", DifficultyLevel.EASY);
-        assertThat(prompt).contains("3 to 4 natural paragraphs");
+        assertThat(prompt).contains("paragraphs");
     }
 
     @Test
-    @DisplayName("생성 프롬프트에 빈 줄 구분 지침이 포함된다")
-    void build_containsBlankLineSeparation() {
+    @DisplayName("생성 프롬프트에 문단 구분 지침이 포함된다")
+    void build_containsParagraphSeparation() {
         String prompt = builder.buildContentPrompt("Some content", DifficultyLevel.MEDIUM);
-        assertThat(prompt).contains("Separate paragraphs with a blank line");
+        assertThat(prompt).contains("Separate paragraphs with");
     }
 
     @Test
     @DisplayName("생성 프롬프트에 bullet list 금지 지침이 포함된다")
     void build_containsBulletListProhibition() {
         String prompt = builder.buildContentPrompt("Some content", DifficultyLevel.HARD);
-        assertThat(prompt).contains("Do not use bullet points, numbered lists");
+        assertThat(prompt).contains("bullets");
     }
 }

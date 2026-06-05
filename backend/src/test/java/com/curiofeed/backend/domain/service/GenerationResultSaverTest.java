@@ -75,10 +75,10 @@ class GenerationResultSaverTest {
         em.persist(category);
 
         article = newInstance(Article.class);
-        setField(article, "originalTitle", "Test Article");
-        setField(article, "sourceName", "Test Source");
+        setField(article, "sourceTitle", "Test Article");
+        setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + UUID.randomUUID());
-        setField(article, "originalPublishedAt", Instant.now());
+        setField(article, "sourcePublishedAt", Instant.now());
         setField(article, "title", "Test Article");
         setField(article, "slug", "test-article-" + UUID.randomUUID());
         setField(article, "category", category);
@@ -96,7 +96,7 @@ class GenerationResultSaverTest {
         var quiz = new GenerationResult.QuizData(
                 QuizType.MULTIPLE_CHOICE, "What is an apple?",
                 new QuizOptions(null, null), "A", "Apple is a fruit.");
-        return new GenerationResult("Rewritten content.", List.of(vocab), List.of(quiz), null, null);
+        return new GenerationResult("Rewritten content.", List.of(), List.of(vocab), List.of(quiz), null);
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ class GenerationResultSaverTest {
     @DisplayName("quiz 없음: CONTENT_WITH_VOCAB 반환, content+vocab만 DB에 존재")
     void save_noQuiz_returnsContentWithVocab() {
         var vocab = new GenerationResult.VocabularyData("word", "definition", "example");
-        var result = new GenerationResult("Some content.", List.of(vocab), null, null, null);
+        var result = new GenerationResult("Some content.", List.of(), List.of(vocab), null, null);
         SaveStatus status = saver.save(article.getId(), DifficultyLevel.HARD, result);
 
         assertThat(status).isEqualTo(SaveStatus.CONTENT_WITH_VOCAB);
@@ -159,7 +159,7 @@ class GenerationResultSaverTest {
         var updatedResult = new GenerationResult("Updated content.", List.of(), List.of(), null, null);
         // NOTE: save with no vocab/quiz but we just verify overwrite
         var updatedWithVocab = new GenerationResult.VocabularyData("banana", "yellow fruit", "I like bananas.");
-        var rewriteResult = new GenerationResult("Updated content.", List.of(updatedWithVocab), List.of(), null, null);
+        var rewriteResult = new GenerationResult("Updated content.", List.of(), List.of(updatedWithVocab), List.of(), null);
         SaveStatus status = saver.save(article.getId(), DifficultyLevel.EASY, rewriteResult);
 
         assertThat(status).isEqualTo(SaveStatus.CONTENT_WITH_VOCAB);

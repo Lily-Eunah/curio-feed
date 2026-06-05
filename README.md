@@ -48,6 +48,30 @@ The entire stack is containerized for easy local development.
    - **Backend API Docs (Swagger)**: http://localhost:8080/swagger-ui.html
 
 
+
+## 🚀 Production Deployment
+
+Curio Feed is configured for production deployment using the following architecture:
+- **Frontend**: Hosted on **Cloudflare Pages** (Vite + React + TS) for global CDN delivery, security, and edge performance.
+- **Backend**: Deployed on **Oracle Cloud Always Free VM** running a Docker container, reverse-proxied by **Caddy** (with automatic Let's Encrypt SSL/TLS certificates).
+- **Database**: Run on **Neon PostgreSQL** (serverless database for low-overhead production traffic).
+
+For detailed instructions, step-by-step setup guides, and validation checklists, refer to the following documents:
+* [**Phase 1 Deployment & Verification Guide (Domain-less)**](docs/DEPLOYMENT_PHASE1.md): Steps to verify the integration between Cloudflare Pages and the Oracle Cloud VM using Cloudflare Quick Tunnels before purchasing a domain.
+* [**Full Infrastructure & Deployment Plan**](implementation_plan.md): The comprehensive architectural blueprint, system settings (JPA, Hikari, JVM memory limits), and Phase 1/Phase 2 details.
+
+### Quick Deployment on VM
+A helper deployment script is provided at `infra/deploy.sh`. To deploy updates to your Oracle VM:
+1. Clone the repository to `/opt/curiofeed` on your VM.
+2. Set up the production database connection parameters and CORS origins in `/opt/curiofeed/infra/.env` (see `infra/.env.example`).
+3. Run the script:
+   ```bash
+   chmod +x infra/deploy.sh
+   ./infra/deploy.sh
+   ```
+This will automatically pull the latest `main` branch, build/re-create the container, prune unused Docker assets to conserve disk space, and check the container status.
+
+
 ## 📚 Engineering Deep-Dives
 I document the architectural "Why" to share my thought process and engineering journey.
 

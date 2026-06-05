@@ -46,9 +46,8 @@ public class ArticleStatusAggregator {
             return;
         }
 
-        // 집계 규칙
-        boolean anyCompleted = subJobs.stream().anyMatch(s -> s.getStatus() == JobStatus.COMPLETED);
-        ArticleStatus targetStatus = anyCompleted ? ArticleStatus.REVIEWING : ArticleStatus.FAILED;
+        // 집계 규칙: 컨텐츠 생성 단계 완료 시 DRAFT 상태로 설정
+        ArticleStatus targetStatus = ArticleStatus.DRAFT;
 
         // 낙관적 락 재시도
         for (int attempt = 0; attempt < MAX_RETRY; attempt++) {

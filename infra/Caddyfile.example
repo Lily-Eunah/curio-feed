@@ -1,0 +1,14 @@
+api.curiofeed.com {
+    reverse_proxy 127.0.0.1:8080
+
+    header {
+        # Enable HTTP Strict Transport Security (HSTS)
+        Strict-Transport-Security "max-age=31536000;"
+        # Prevent browsers from MIME-sniffing a response away from the declared content-type
+        X-Content-Type-Options "nosniff"
+        # Prevent clickjacking attacks by forbidding framing
+        X-Frame-Options "DENY"
+        # Limit referrer information sent with requests
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}

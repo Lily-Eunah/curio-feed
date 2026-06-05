@@ -14,10 +14,12 @@ import java.util.UUID;
 public record ArticleDetailResponse(
     UUID id,
     String title,
-    String originalTitle,
-    String sourceName,
+    String sourceTitle,
+    String sourcePublisher,
     String sourceUrl,
     Instant publishedAt,
+    Instant sourcePublishedAt,
+    Instant sourceAccessedAt,
     String categoryName,
     List<DifficultyLevel> availableLevels,
     ArticleContentDto content

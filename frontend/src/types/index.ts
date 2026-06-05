@@ -31,9 +31,12 @@ export interface Article {
   date: string;
   readTime: string;
   title: string;
-  originalTitle?: string;
-  sourceName?: string;
+  sourceTitle?: string;
+  sourcePublisher?: string;
   sourceUrl?: string;
+  sourcePublishedAt?: string;
+  sourceAccessedAt?: string;
+  audioUrl?: string | null;
   excerpt: string;
   vocabulary: VocabEntry[];
   body: string;

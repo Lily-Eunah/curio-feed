@@ -12,6 +12,7 @@ import com.curiofeed.backend.infrastructure.llm.LlmParseException;
 import com.curiofeed.backend.infrastructure.llm.LlmResponseParser;
 import com.curiofeed.backend.infrastructure.llm.validation.GenerationResultValidator;
 import com.curiofeed.backend.infrastructure.llm.validation.ValidationResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,7 +39,6 @@ class SubJobWorkerTest {
     @Mock private ArticleRepository articleRepository;
     @Mock private ArticlePromptBuilder promptBuilder;
     @Mock private LlmClient primaryLlmClient;
-    @Mock private LlmClient fallbackLlmClient;
     @Mock private LlmResponseParser responseParser;
     @Mock private GenerationResultValidator validator;
     @Mock private GenerationResultSaver resultSaver;
@@ -56,8 +57,8 @@ class SubJobWorkerTest {
     void setUp() {
         pipelineProperties = new PipelineProperties(3, 10, 3000, 5, null, false);
         worker = new SubJobWorker(lockService, subJobRepository, articleRepository, promptBuilder,
-                primaryLlmClient, fallbackLlmClient, responseParser, validator,
-                resultSaver, aggregator, pipelineProperties, metrics);
+                primaryLlmClient, responseParser, validator,
+                resultSaver, aggregator, pipelineProperties, metrics, new ObjectMapper());
 
         articleId = UUID.randomUUID();
         job = new ArticleGenerationJob(articleId, JobStatus.PENDING);
@@ -68,18 +69,48 @@ class SubJobWorkerTest {
         setField(subJob, "id", subJobId);
     }
 
+    // ── Setup helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Stubs the 3-step pipeline (content → vocabulary → quiz) for a short article.
+     * Uses anyString() / any(Map.class) to match the 2-arg generate(prompt, schema) call.
+     */
+    private void stubThreeStepPipeline() {
+        var step1Result = new GenerationResult("generated content", List.of(), List.of(), List.of(), null);
+        var vocab = new GenerationResult.VocabularyData("word", "def", "example");
+        var step2Result = new GenerationResult(null, List.of(), List.of(vocab), List.of(), null);
+        var quiz = new GenerationResult.QuizData(QuizType.MULTIPLE_CHOICE, "q?",
+                new com.curiofeed.backend.domain.model.QuizOptions(null, null), "A", "exp");
+        var step3Result = new GenerationResult(null, List.of(), List.of(), List.of(quiz), null);
+
+        when(promptBuilder.buildContentPrompt(anyString(), any())).thenReturn("p1");
+        when(promptBuilder.buildVocabularyPrompt(anyString(), any())).thenReturn("p2");
+        when(promptBuilder.buildQuizPrompt(anyString(), anyString())).thenReturn("p3");
+
+        when(primaryLlmClient.generate(eq("p1"), any(Map.class))).thenReturn("r1");
+        when(primaryLlmClient.generate(eq("p2"), any(Map.class))).thenReturn("r2");
+        when(primaryLlmClient.generate(eq("p3"), isNull())).thenReturn("r3");
+
+        when(responseParser.parse(eq("r1"), eq(GenerationResult.class))).thenReturn(step1Result);
+        when(responseParser.parse(eq("r2"), eq(GenerationResult.class))).thenReturn(step2Result);
+        when(responseParser.parse(eq("r3"), eq(GenerationResult.class))).thenReturn(step3Result);
+    }
+
+    // ── Tests ─────────────────────────────────────────────────────────────────
+
     @Test
-    @DisplayName("primary 통과: status COMPLETED, retryCount=1, aggregate 호출")
-    void process_primaryPasses_completed() {
+    @DisplayName("3단계 파이프라인 통과: status COMPLETED, retryCount=1, aggregate 호출")
+    void process_pipelinePasses_completed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
+        stubThreeStepPipeline();
 
-        var result = new GenerationResult("content", List.of(), List.of(), null, null);
-        when(primaryLlmClient.generate("prompt")).thenReturn("{}");
-        when(responseParser.parse(eq("{}"), eq(GenerationResult.class))).thenReturn(result);
-        when(validator.validate(result)).thenReturn(ValidationResult.pass(0.85));
+        var finalResult = new GenerationResult("generated content", List.of(),
+                List.of(new GenerationResult.VocabularyData("word", "def", "ex")),
+                List.of(new GenerationResult.QuizData(QuizType.MULTIPLE_CHOICE, "q?",
+                        new com.curiofeed.backend.domain.model.QuizOptions(null, null), "A", "exp")), null);
+        when(validator.validate(any())).thenReturn(ValidationResult.pass(0.85));
         when(resultSaver.save(any(), any(), any())).thenReturn(SaveStatus.FULL_SUCCESS);
 
         worker.process(subJobId);
@@ -87,72 +118,17 @@ class SubJobWorkerTest {
         assertThat(subJob.getStatus()).isEqualTo(JobStatus.COMPLETED);
         assertThat(subJob.getRetryCount()).isEqualTo(1);
         verify(aggregator).aggregate(job.getId());
-        verifyNoInteractions(fallbackLlmClient);
     }
 
     @Test
-    @DisplayName("primary score 미달 → fallback 통과: COMPLETED, fallback 사용")
-    void process_primaryLowScore_fallbackPasses_completed() {
+    @DisplayName("LLM 호출 실패: FAILED")
+    void process_llmFails_failed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
-
-        var primaryResult = new GenerationResult("short", List.of(), List.of(), null, null);
-        var fallbackResult = new GenerationResult("long content", List.of(), List.of(), null, null);
-
-        when(primaryLlmClient.generate("prompt")).thenReturn("primary");
-        when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);
-        when(validator.validate(primaryResult)).thenReturn(ValidationResult.pass(0.50)); // threshold 0.7 미달
-
-        when(fallbackLlmClient.generate("prompt")).thenReturn("fallback");
-        when(responseParser.parse(eq("fallback"), eq(GenerationResult.class))).thenReturn(fallbackResult);
-        when(validator.validate(fallbackResult)).thenReturn(ValidationResult.pass(0.80));
-        when(resultSaver.save(any(), any(), any())).thenReturn(SaveStatus.FULL_SUCCESS);
-
-        worker.process(subJobId);
-
-        assertThat(subJob.getStatus()).isEqualTo(JobStatus.COMPLETED);
-        verify(metrics).recordFallback(DifficultyLevel.EASY);
-        verify(metrics).recordQwenUsage();
-    }
-
-    @Test
-    @DisplayName("primary hard fail → fallback 통과: COMPLETED")
-    void process_primaryHardFail_fallbackPasses_completed() {
-        when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
-        when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
-
-        var primaryResult = new GenerationResult("content", List.of(), List.of(), null, null);
-        var fallbackResult = new GenerationResult("good content", List.of(), List.of(), null, null);
-
-        when(primaryLlmClient.generate("prompt")).thenReturn("primary");
-        when(responseParser.parse(eq("primary"), eq(GenerationResult.class))).thenReturn(primaryResult);
-        when(validator.validate(primaryResult))
-                .thenReturn(ValidationResult.fail(List.of("vocab count != 5"), 0.0));
-
-        when(fallbackLlmClient.generate("prompt")).thenReturn("fallback");
-        when(responseParser.parse(eq("fallback"), eq(GenerationResult.class))).thenReturn(fallbackResult);
-        when(validator.validate(fallbackResult)).thenReturn(ValidationResult.pass(0.82));
-        when(resultSaver.save(any(), any(), any())).thenReturn(SaveStatus.FULL_SUCCESS);
-
-        worker.process(subJobId);
-
-        assertThat(subJob.getStatus()).isEqualTo(JobStatus.COMPLETED);
-        verify(metrics).recordFallback(DifficultyLevel.EASY);
-    }
-
-    @Test
-    @DisplayName("primary + fallback 모두 실패: FAILED")
-    void process_primaryAndFallbackFail_failed() {
-        when(lockService.tryLock(subJobId)).thenReturn(true);
-        when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
-        when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
-        when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("timeout"));
-        when(fallbackLlmClient.generate("prompt")).thenThrow(new LlmClientException("timeout"));
+        when(promptBuilder.buildContentPrompt(anyString(), any())).thenReturn("p1");
+        when(primaryLlmClient.generate(eq("p1"), any(Map.class)))
+                .thenThrow(new LlmClientException("timeout"));
 
         worker.process(subJobId);
 
@@ -162,16 +138,15 @@ class SubJobWorkerTest {
     }
 
     @Test
-    @DisplayName("primary + fallback 모두 파싱 실패: FAILED")
-    void process_primaryAndFallbackParseFail_failed() {
+    @DisplayName("LLM 응답 파싱 실패: FAILED")
+    void process_parseFails_failed() {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
-        when(primaryLlmClient.generate("prompt")).thenReturn("bad");
+        when(promptBuilder.buildContentPrompt(anyString(), any())).thenReturn("p1");
+        when(primaryLlmClient.generate(eq("p1"), any(Map.class))).thenReturn("bad");
         when(responseParser.parse(eq("bad"), eq(GenerationResult.class)))
                 .thenThrow(new LlmParseException("bad json"));
-        when(fallbackLlmClient.generate("prompt")).thenReturn("bad");
 
         worker.process(subJobId);
 
@@ -187,7 +162,7 @@ class SubJobWorkerTest {
         worker.process(subJobId);
 
         assertThat(subJob.getRetryCount()).isEqualTo(0);
-        verifyNoInteractions(promptBuilder, primaryLlmClient, fallbackLlmClient, responseParser, resultSaver, aggregator);
+        verifyNoInteractions(promptBuilder, primaryLlmClient, responseParser, resultSaver, aggregator);
     }
 
     @Test
@@ -200,7 +175,7 @@ class SubJobWorkerTest {
         worker.process(subJobId);
 
         assertThat(subJob.getStatus()).isEqualTo(JobStatus.FAILED);
-        verifyNoInteractions(primaryLlmClient, fallbackLlmClient);
+        verifyNoInteractions(primaryLlmClient);
         verify(aggregator).aggregate(job.getId());
     }
 
@@ -210,8 +185,8 @@ class SubJobWorkerTest {
         AtomicBoolean heartbeatStopped = new AtomicBoolean(false);
         SubJobWorker spyWorker = new SubJobWorker(
                 lockService, subJobRepository, articleRepository, promptBuilder,
-                primaryLlmClient, fallbackLlmClient, responseParser, validator,
-                resultSaver, aggregator, pipelineProperties, metrics) {
+                primaryLlmClient, responseParser, validator,
+                resultSaver, aggregator, pipelineProperties, metrics, new ObjectMapper()) {
             @Override
             protected void stopHeartbeat(java.util.concurrent.ScheduledExecutorService executor) {
                 heartbeatStopped.set(true);
@@ -222,9 +197,9 @@ class SubJobWorkerTest {
         when(lockService.tryLock(subJobId)).thenReturn(true);
         when(subJobRepository.findByIdWithJob(subJobId)).thenReturn(Optional.of(subJob));
         when(articleRepository.findById(articleId)).thenReturn(Optional.of(mockArticle(articleId)));
-        when(promptBuilder.buildContentPrompt(any(), any())).thenReturn("prompt");
-        when(primaryLlmClient.generate("prompt")).thenThrow(new LlmClientException("fail"));
-        when(fallbackLlmClient.generate("prompt")).thenThrow(new LlmClientException("fail"));
+        when(promptBuilder.buildContentPrompt(anyString(), any())).thenReturn("p1");
+        when(primaryLlmClient.generate(eq("p1"), any(Map.class)))
+                .thenThrow(new LlmClientException("fail"));
 
         spyWorker.process(subJobId);
 

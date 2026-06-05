@@ -46,7 +46,7 @@ class ThreeStepPromptBuilderTest {
     @DisplayName("buildContentPrompt: EASY 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_easyWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.EASY, false);
-        assertThat(prompt).contains("180~260 words");
+        assertThat(prompt).contains("200~280 words");
         assertThat(prompt).contains("320 words");
     }
 

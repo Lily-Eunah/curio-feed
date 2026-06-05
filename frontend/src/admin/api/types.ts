@@ -1,5 +1,5 @@
 export type JobStatus = 'PENDING' | 'PROCESSING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
-export type ArticleStatus = 'DRAFT' | 'REVIEWING' | 'PUBLISHED' | 'HIDDEN' | 'READY' | 'STALE';
+export type ArticleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type DifficultyLevel = 'EASY' | 'MEDIUM' | 'HARD';
 export type GenerationStepType = 'CONTENT' | 'VOCABULARY' | 'QUIZ';
 

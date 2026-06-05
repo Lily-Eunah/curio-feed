@@ -30,7 +30,7 @@ function renderPage(articleId = 'article-abc') {
 
 const mockStatus: GenerationStatusResponse = {
   articleId: 'article-abc',
-  articleStatus: 'REVIEWING',
+  articleStatus: 'DRAFT',
   job: {
     jobId: 'job-xyz',
     subJobs: [
@@ -43,7 +43,7 @@ const mockStatus: GenerationStatusResponse = {
 
 const mockDetail: AdminArticleDetailResponse = {
   id: 'article-abc',
-  status: 'REVIEWING',
+  status: 'DRAFT',
   title: null as unknown as string,    // missing — renders as "—"
   originalTitle: null as unknown as string,
   sourceName: null as unknown as string,
@@ -114,7 +114,7 @@ describe('ArticleDetailPage', () => {
       renderPage();
       await waitFor(() => {
         expect(screen.getByText('article-abc')).toBeInTheDocument();
-        expect(screen.getByText(/reviewing/i)).toBeInTheDocument();
+        expect(screen.getByText(/draft/i)).toBeInTheDocument();
         expect(screen.getByText('job-xyz')).toBeInTheDocument();
       });
     });
@@ -183,7 +183,7 @@ describe('ArticleDetailPage', () => {
   });
 
   describe('Status controls', () => {
-    it('shows Publish button when article is in REVIEWING status', async () => {
+    it('shows Publish button when article is in DRAFT status (default)', async () => {
       renderPage();
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /publish/i })).toBeInTheDocument();
@@ -201,18 +201,18 @@ describe('ArticleDetailPage', () => {
       });
     });
 
-    it('shows Hide button when article is PUBLISHED', async () => {
+    it('shows Archive button when article is PUBLISHED', async () => {
       vi.mocked(getAdminArticleDetail).mockResolvedValue({ ...mockDetail, status: 'PUBLISHED' });
       renderPage();
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /hide/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /archive/i })).toBeInTheDocument();
       });
     });
 
-    it('shows Publish button when article is HIDDEN', async () => {
+    it('shows Publish button when article is ARCHIVED', async () => {
       vi.mocked(getGenerationStatus).mockResolvedValue({
         ...mockStatus,
-        articleStatus: 'HIDDEN',
+        articleStatus: 'ARCHIVED',
       });
       renderPage();
       await waitFor(() => {
@@ -232,20 +232,20 @@ describe('ArticleDetailPage', () => {
       });
     });
 
-    it('calls updateAdminArticleStatus with HIDDEN when Hide is clicked', async () => {
+    it('calls updateAdminArticleStatus with ARCHIVED when Archive is clicked', async () => {
       const user = userEvent.setup();
       vi.mocked(getAdminArticleDetail).mockResolvedValue({ ...mockDetail, status: 'PUBLISHED' });
       vi.mocked(updateAdminArticleStatus).mockResolvedValue({
         articleId: 'article-abc',
-        status: 'HIDDEN',
+        status: 'ARCHIVED',
       });
       renderPage();
-      await waitFor(() => screen.getByRole('button', { name: /hide/i }));
+      await waitFor(() => screen.getByRole('button', { name: /archive/i }));
 
-      await user.click(screen.getByRole('button', { name: /hide/i }));
+      await user.click(screen.getByRole('button', { name: /archive/i }));
 
       await waitFor(() => {
-        expect(updateAdminArticleStatus).toHaveBeenCalledWith('article-abc', 'HIDDEN');
+        expect(updateAdminArticleStatus).toHaveBeenCalledWith('article-abc', 'ARCHIVED');
       });
     });
 

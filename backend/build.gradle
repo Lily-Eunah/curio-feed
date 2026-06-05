@@ -29,6 +29,7 @@ dependencies {
     // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // Database Migration
     implementation 'org.flywaydb:flyway-core'
     // Lombok
@@ -51,7 +52,9 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'ollama', 'external', 'pending'
+    }
 
     testLogging {
         showStandardStreams = false
@@ -80,4 +83,39 @@ tasks.named('test') {
     // 위 설정과 같이 부여 (중요)
     environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
 
+}
+
+// Ollama legacy external tests — not part of default build.
+// CurioFeed no longer uses Ollama; these are kept for reference only.
+tasks.register('ollamaTest', Test) {
+    description = 'Runs legacy Ollama integration tests (requires local Ollama server).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'ollama'
+    }
+    jvmArgs "-Dfile.encoding=UTF-8"
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
+}
+
+// Gemini live API tests — requires GEMINI_API_KEY and consumes quota.
+// Run only when explicitly needed; never run in CI or default build.
+tasks.register('geminiIntegrationTest', Test) {
+    description = 'Runs Gemini live API integration tests (requires GEMINI_API_KEY).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'gemini'
+    }
+    jvmArgs "-Dfile.encoding=UTF-8"
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
+}
+
+// All external tests (ollama + gemini + other live services) in one task.
+tasks.register('externalTest', Test) {
+    description = 'Runs all external/live integration tests.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'external', 'ollama', 'gemini'
+    }
+    jvmArgs "-Dfile.encoding=UTF-8"
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
 }

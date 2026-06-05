@@ -107,7 +107,7 @@ describe('Admin API Client', () => {
     it('returns GenerationStatusResponse with job and subJobs', async () => {
       const response = {
         articleId: 'a1',
-        articleStatus: 'REVIEWING',
+        articleStatus: 'DRAFT',
         job: {
           jobId: 'j1',
           subJobs: [{ subJobId: 'sub-1', level: 'EASY', status: 'COMPLETED', retryCount: 0 }],
@@ -117,7 +117,7 @@ describe('Admin API Client', () => {
 
       const result = await getGenerationStatus('a1');
 
-      expect(result.articleStatus).toBe('REVIEWING');
+      expect(result.articleStatus).toBe('DRAFT');
       expect(result.job?.subJobs[0].level).toBe('EASY');
     });
 
@@ -248,16 +248,16 @@ describe('Admin API Client', () => {
     });
 
     it('returns updated articleId and status', async () => {
-      vi.stubGlobal('fetch', mockOk({ articleId: 'a1', status: 'HIDDEN' }));
+      vi.stubGlobal('fetch', mockOk({ articleId: 'a1', status: 'ARCHIVED' }));
 
-      const result = await updateAdminArticleStatus('a1', 'HIDDEN');
-      expect(result).toEqual({ articleId: 'a1', status: 'HIDDEN' });
+      const result = await updateAdminArticleStatus('a1', 'ARCHIVED');
+      expect(result).toEqual({ articleId: 'a1', status: 'ARCHIVED' });
     });
 
     it('throws ApiError on 400 invalid transition', async () => {
       vi.stubGlobal('fetch', mockErr(400, { error: 'Bad Request', message: 'Invalid status transition' }));
 
-      await expect(updateAdminArticleStatus('a1', 'HIDDEN')).rejects.toBeInstanceOf(ApiError);
+      await expect(updateAdminArticleStatus('a1', 'ARCHIVED')).rejects.toBeInstanceOf(ApiError);
     });
   });
 

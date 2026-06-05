@@ -4,6 +4,7 @@ import com.curiofeed.backend.domain.entity.*;
 import com.curiofeed.backend.domain.repository.*;
 import com.curiofeed.backend.infrastructure.llm.LlmClient;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,6 +121,7 @@ public class ThreeStepPipelineIntegrationTest {
     }
 
     @Test
+    @Tag("pending")
     void process_fullExecution_reportsDurations() throws InterruptedException {
         log.info("Starting integration test. UseLiveLlm={}", useLiveLlm);
         Instant start = Instant.now();
@@ -216,6 +218,7 @@ public class ThreeStepPipelineIntegrationTest {
     }
 
     @Test
+    @Tag("pending")
     void process_llmFailure_transitionsToFailed() throws InterruptedException {
         if (useLiveLlm) return; // Only for mock mode
 

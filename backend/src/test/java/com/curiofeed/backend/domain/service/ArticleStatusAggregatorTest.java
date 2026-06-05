@@ -61,10 +61,10 @@ class ArticleStatusAggregatorTest {
         em.persist(category);
 
         article = newInstance(Article.class);
-        setField(article, "originalTitle", "Test");
-        setField(article, "sourceName", "Src");
+        setField(article, "sourceTitle", "Test");
+        setField(article, "sourcePublisher", "Src");
         setField(article, "sourceUrl", "https://example.com/" + UUID.randomUUID());
-        setField(article, "originalPublishedAt", Instant.now());
+        setField(article, "sourcePublishedAt", Instant.now());
         setField(article, "title", "Test");
         setField(article, "slug", "slug-" + UUID.randomUUID());
         setField(article, "category", category);
@@ -83,8 +83,8 @@ class ArticleStatusAggregatorTest {
     }
 
     @Test
-    @DisplayName("모든 SubJob COMPLETED → Article.status = REVIEWING")
-    void allCompleted_setsReviewing() {
+    @DisplayName("모든 SubJob COMPLETED → Article.status = DRAFT (관리자가 명시적으로 PUBLISHED 처리)")
+    void allCompleted_setsDraft() {
         createSubJob(DifficultyLevel.EASY, JobStatus.COMPLETED);
         createSubJob(DifficultyLevel.MEDIUM, JobStatus.COMPLETED);
         createSubJob(DifficultyLevel.HARD, JobStatus.COMPLETED);
@@ -94,12 +94,12 @@ class ArticleStatusAggregatorTest {
         em.flush(); em.clear();
 
         Article updated = articleRepository.findById(article.getId()).orElseThrow();
-        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.REVIEWING);
+        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("모든 SubJob FAILED → Article.status = FAILED")
-    void allFailed_setsFailed() {
+    @DisplayName("모든 SubJob FAILED → Article.status = DRAFT (콘텐츠 없어도 DRAFT 유지)")
+    void allFailed_setsDraft() {
         createSubJob(DifficultyLevel.EASY, JobStatus.FAILED);
         createSubJob(DifficultyLevel.MEDIUM, JobStatus.FAILED);
         createSubJob(DifficultyLevel.HARD, JobStatus.FAILED);
@@ -109,12 +109,12 @@ class ArticleStatusAggregatorTest {
         em.flush(); em.clear();
 
         Article updated = articleRepository.findById(article.getId()).orElseThrow();
-        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.FAILED);
+        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("부분 성공 (1 COMPLETED, 2 FAILED) → Article.status = REVIEWING")
-    void partial_setsReviewing() {
+    @DisplayName("부분 성공 (1 COMPLETED, 2 FAILED) → Article.status = DRAFT")
+    void partial_setsDraft() {
         createSubJob(DifficultyLevel.EASY, JobStatus.COMPLETED);
         createSubJob(DifficultyLevel.MEDIUM, JobStatus.FAILED);
         createSubJob(DifficultyLevel.HARD, JobStatus.FAILED);
@@ -124,7 +124,7 @@ class ArticleStatusAggregatorTest {
         em.flush(); em.clear();
 
         Article updated = articleRepository.findById(article.getId()).orElseThrow();
-        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.REVIEWING);
+        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.DRAFT);
     }
 
     @Test

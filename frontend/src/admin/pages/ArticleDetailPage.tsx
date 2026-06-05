@@ -26,11 +26,10 @@ function getStatusAction(status: ArticleStatus | undefined): {
 } | null {
   switch (status) {
     case 'DRAFT':
-    case 'REVIEWING':
-    case 'HIDDEN':
+    case 'ARCHIVED':
       return { label: 'Publish', targetStatus: 'PUBLISHED', variant: 'primary' };
     case 'PUBLISHED':
-      return { label: 'Hide', targetStatus: 'HIDDEN', variant: 'danger' };
+      return { label: 'Archive', targetStatus: 'ARCHIVED', variant: 'danger' };
     default:
       return null;
   }

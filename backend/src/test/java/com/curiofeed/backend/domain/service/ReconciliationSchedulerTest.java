@@ -61,10 +61,10 @@ class ReconciliationSchedulerTest {
         em.persist(category);
 
         article = newInstance(Article.class);
-        setField(article, "originalTitle", "T");
-        setField(article, "sourceName", "S");
+        setField(article, "sourceTitle", "T");
+        setField(article, "sourcePublisher", "S");
         setField(article, "sourceUrl", "https://e.com/" + UUID.randomUUID());
-        setField(article, "originalPublishedAt", Instant.now());
+        setField(article, "sourcePublishedAt", Instant.now());
         setField(article, "title", "T");
         setField(article, "slug", "s-" + UUID.randomUUID());
         setField(article, "category", category);
@@ -144,7 +144,7 @@ class ReconciliationSchedulerTest {
         em.flush(); em.clear();
 
         Article updated = articleRepository.findById(article.getId()).orElseThrow();
-        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.REVIEWING);
+        assertThat(updated.getStatus()).isEqualTo(ArticleStatus.DRAFT);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

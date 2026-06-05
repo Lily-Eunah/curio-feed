@@ -60,10 +60,10 @@ class ArticleFeedRepositoryTest {
 
     private Article createArticle(Category cat, ArticleStatus status, Instant publishedAt, String slug) {
         Article article = newInstance(Article.class);
-        setField(article, "originalTitle", "Original: " + slug);
-        setField(article, "sourceName", "Test Source");
+        setField(article, "sourceTitle", "Original: " + slug);
+        setField(article, "sourcePublisher", "Test Source");
         setField(article, "sourceUrl", "https://example.com/" + slug);
-        setField(article, "originalPublishedAt", publishedAt);
+        setField(article, "sourcePublishedAt", publishedAt);
         setField(article, "title", "Title: " + slug);
         setField(article, "slug", slug);
         setField(article, "category", cat);
@@ -134,9 +134,9 @@ class ArticleFeedRepositoryTest {
         createArticle(category, ArticleStatus.DRAFT,
                 base.minusSeconds(7 * 3600L), "draft-2");
 
-        // HIDDEN article (1)
-        createArticle(category, ArticleStatus.HIDDEN,
-                base.minusSeconds(8 * 3600L), "hidden-1");
+        // ARCHIVED article (1) — must not appear in public feed
+        createArticle(category, ArticleStatus.ARCHIVED,
+                base.minusSeconds(8 * 3600L), "archived-1");
 
         em.flush();
         em.clear();

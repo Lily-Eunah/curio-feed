@@ -92,7 +92,7 @@ describe('fetchFeedArticles', () => {
   it('returns typed CursorPageResponse', async () => {
     const payload = {
       data: [{
-        id: 'u1', title: 'Title', categoryName: 'Tech', sourceName: 'Src',
+        id: 'u1', title: 'Title', categoryName: 'Tech', sourcePublisher: 'Src',
         thumbnailUrl: '', publishedAt: '2026-01-01T00:00:00Z',
         estimatedReadingTime: 3, excerpt: 'E',
       }],
@@ -127,8 +127,10 @@ describe('fetchArticleDetail', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const detail = {
-    id: 'u1', title: 'T', originalTitle: 'OT', sourceName: 'S', sourceUrl: 'http://s',
-    thumbnailUrl: '', publishedAt: '2026-01-01T00:00:00Z', categoryName: 'Tech',
+    id: 'u1', title: 'T', sourceTitle: 'OT', sourcePublisher: 'S', sourceUrl: 'http://s',
+    thumbnailUrl: '', publishedAt: '2026-01-01T00:00:00Z',
+    sourcePublishedAt: '2026-01-01T00:00:00Z', sourceAccessedAt: '2026-01-01T00:00:00Z',
+    categoryName: 'Tech',
     availableLevels: ['EASY'],
     content: { id: 'c1', level: 'EASY', content: 'body', audioUrl: null, vocabularies: [], quizzes: [] },
   };

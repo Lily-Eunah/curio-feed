@@ -10,7 +10,7 @@ export interface FeedArticleDto {
   id: string;
   title: string;
   categoryName: string;
-  sourceName: string;
+  sourcePublisher: string;
   publishedAt: string;
   estimatedReadingTime: number;
   excerpt: string;
@@ -19,10 +19,12 @@ export interface FeedArticleDto {
 export interface ArticleDetailDto {
   id: string;
   title: string;
-  originalTitle: string;
-  sourceName: string;
+  sourceTitle: string;
+  sourcePublisher: string;
   sourceUrl: string;
   publishedAt: string;
+  sourcePublishedAt: string;
+  sourceAccessedAt: string;
   categoryName: string;
   availableLevels: DifficultyLevel[];
   content: ArticleContentDto;

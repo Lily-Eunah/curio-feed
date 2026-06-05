@@ -131,7 +131,7 @@ public class ThreeStepSubJobWorker {
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new IllegalStateException("Article not found: " + articleId));
         String originalContent = article.getOriginalContent();
-        String originalTitle = article.getOriginalTitle();
+        String originalTitle = article.getSourceTitle();
 
         ScheduledExecutorService heartbeat = startHeartbeat(subJobId);
         try {
@@ -221,7 +221,7 @@ public class ThreeStepSubJobWorker {
         if (suggestedTitle == null || suggestedTitle.isBlank()) return;
         try {
             Article article = articleRepository.findById(articleId).orElse(null);
-            if (article != null && article.getTitle().equals(article.getOriginalTitle())) {
+            if (article != null && article.getTitle().equals(article.getSourceTitle())) {
                 article.updateTitle(suggestedTitle);
                 articleRepository.save(article);
                 log.info("[articleId={}] Updated title to: {}", articleId, suggestedTitle);
