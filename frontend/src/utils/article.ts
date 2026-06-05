@@ -208,6 +208,9 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     date: feedArticle?.date ?? formatDate(dto.publishedAt),
     readTime: feedArticle?.readTime ?? calcReadingTime(wordCount, dto.content.level),
     title: dto.title,
+    originalTitle: dto.originalTitle,
+    sourceName: dto.sourceName,
+    sourceUrl: dto.sourceUrl,
     excerpt: feedArticle?.excerpt ?? '',
     vocabulary: dto.content.vocabularies.map((v) => ({
       word: v.word,
