@@ -27,7 +27,7 @@ public interface ArticleFeedRepository extends JpaRepository<com.curiofeed.backe
         JOIN a.category c
         LEFT JOIN ArticleContent ac ON ac.article = a AND ac.level = :level
         WHERE a.status = :status
-        AND (a.publishedAt < :cursorAt OR (a.publishedAt = :cursorAt AND a.id < :cursorId))
+        AND (a.publishedAt, a.id) < (:cursorAt, :cursorId)
         ORDER BY a.publishedAt DESC, a.id DESC
     """)
     List<ArticleFeedResponse> findFeedByCursor(
