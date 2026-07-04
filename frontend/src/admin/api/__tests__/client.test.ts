@@ -20,7 +20,9 @@ function mockErr(status: number, body: unknown) {
 }
 
 describe('Admin API Client', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   describe('getAdminCategories', () => {
     it('fetches from /api/admin/categories', async () => {

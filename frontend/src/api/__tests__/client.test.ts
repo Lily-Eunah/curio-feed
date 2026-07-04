@@ -24,7 +24,9 @@ const emptyPage = { data: [], nextCursor: null, hasNext: false };
 // ── fetchFeedArticles ────────────────────────────────────────────────────────
 
 describe('fetchFeedArticles', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('includes VITE_API_BASE_URL in request URL', async () => {
     const mock = mockOk(emptyPage);
@@ -124,7 +126,9 @@ describe('fetchFeedArticles', () => {
 // ── fetchArticleDetail ───────────────────────────────────────────────────────
 
 describe('fetchArticleDetail', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   const detail = {
     id: 'u1', title: 'T', sourceTitle: 'OT', sourcePublisher: 'S', sourceUrl: 'http://s',
@@ -172,7 +176,9 @@ describe('fetchArticleDetail', () => {
 // ── submitQuizAttempt ────────────────────────────────────────────────────────
 
 describe('submitQuizAttempt', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   const okResponse = { isCorrect: true, correctAnswer: 'A', explanation: 'Well done' };
 
