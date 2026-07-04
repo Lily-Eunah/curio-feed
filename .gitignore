@@ -13,9 +13,14 @@ out/
 design/
 reference/
 
-# Claude Code
+# AI Instructions & Agents (Untracked)
 .claude/
 CLAUDE.md
+GEMINI.md
+CODEX.md
+AGENTS.md
+.gemini/
+.codex/
 
 # Build artifacts
 bin/
