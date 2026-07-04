@@ -3,6 +3,7 @@
  */
 
 import { fetchArticleDetail, ApiError } from '../api/client';
+import { getApiBaseUrl } from '../api/baseUrl';
 import type { QuizDto, ArticleDetailDto, FeedArticleDto } from '../api/types';
 import type { Article, DifficultyLevel } from '../types';
 
@@ -202,6 +203,15 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     ? { question: sas[0].question, modelAnswer: sas[0].correctAnswer ?? '' }
     : PLACEHOLDER_QUIZ.q3;
 
+  let audioUrl = dto.content.audioUrl;
+  if (!audioUrl) {
+    audioUrl = `/api/articles/${dto.id}/content/${dto.content.level}/audio`;
+  }
+  if (audioUrl && !audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
+    const baseUrl = getApiBaseUrl();
+    audioUrl = `${baseUrl}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
+  }
+
   return {
     id: dto.id,
     category: dto.categoryName,
@@ -213,7 +223,7 @@ export function mapFullArticle(dto: ArticleDetailDto, feedArticle?: Article): Ar
     sourceUrl: dto.sourceUrl,
     sourcePublishedAt: dto.sourcePublishedAt,
     sourceAccessedAt: dto.sourceAccessedAt,
-    audioUrl: dto.content.audioUrl,
+    audioUrl,
     excerpt: feedArticle?.excerpt ?? '',
     vocabulary: dto.content.vocabularies.map((v) => ({
       word: v.word,

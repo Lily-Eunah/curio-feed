@@ -74,11 +74,16 @@ public class ArticleDetailServiceImpl implements ArticleDetailService {
                         .build())
                 .toList();
 
+        String audioUrl = content.getAudioUrl();
+        if (audioUrl == null || audioUrl.isBlank()) {
+            audioUrl = String.format("/api/articles/%s/content/%s/audio", content.getArticle().getId(), content.getLevel());
+        }
+
         return ArticleDetailResponse.ArticleContentDto.builder()
                 .id(content.getId())
                 .level(content.getLevel())
                 .content(content.getContent())
-                .audioUrl(content.getAudioUrl())
+                .audioUrl(audioUrl)
                 .vocabularies(vocabs)
                 .quizzes(quizzes)
                 .build();
