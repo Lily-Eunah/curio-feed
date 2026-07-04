@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: curio-feed-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    region: singapore
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: curio-feed-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: curio-feed-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: curio-feed-db
+          property: password
+
+databases:
+  - name: curio-feed-db
+    databaseName: curiofeed
+    user: curiofeed
+    region: singapore
+    plan: free

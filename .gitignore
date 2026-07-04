@@ -21,3 +21,6 @@ CLAUDE.md
 bin/
 **/bin/
 
+# Local infra files
+infra/Caddyfile
+
