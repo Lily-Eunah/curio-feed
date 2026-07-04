@@ -21,8 +21,15 @@ export class ApiError extends Error {
 
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {};
+  // Only set Content-Type for requests with a body (POST, PUT, PATCH)
+  // GET requests without this header become "simple requests" that skip CORS preflight
+  if (init?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...init,
   });
   if (!res.ok) {
