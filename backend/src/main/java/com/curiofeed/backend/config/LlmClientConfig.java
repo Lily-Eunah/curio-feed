@@ -13,6 +13,8 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 @Configuration
 public class LlmClientConfig {
 
@@ -21,16 +23,16 @@ public class LlmClientConfig {
     @Bean
     @Primary
     @ConditionalOnProperty(name = "ai.provider", havingValue = "gemini")
-    public LlmClient primaryGeminiClient(GeminiProperties p) {
-        return new GeminiLlmClient(p, p.model(), geminiBuilder(p));
+    public LlmClient primaryGeminiClient(GeminiProperties p, MeterRegistry meterRegistry) {
+        return new GeminiLlmClient(p, p.model(), geminiBuilder(p), meterRegistry);
     }
 
     @Bean
     @Qualifier("fallbackLlmClient")
     @ConditionalOnProperty(name = "ai.provider", havingValue = "gemini")
-    public LlmClient fallbackGeminiClient(GeminiProperties p) {
+    public LlmClient fallbackGeminiClient(GeminiProperties p, MeterRegistry meterRegistry) {
         String fallback = p.fallbackModel() != null ? p.fallbackModel() : p.model();
-        return new GeminiLlmClient(p, fallback, geminiBuilder(p));
+        return new GeminiLlmClient(p, fallback, geminiBuilder(p), meterRegistry);
     }
 
     // ── Ollama beans (active when ai.provider=ollama or not set) ───────────

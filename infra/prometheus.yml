@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+
+scrape_configs:
+  - job_name: 'curio-feed-render-backend'
+    metrics_path: '/actuator/prometheus'
+    scheme: 'https'
+    static_configs:
+      - targets: ['curio-feed-api.onrender.com']
+
+remote_write:
+  - url: '${GRAFANA_REMOTE_WRITE_URL}'
+    basic_auth:
+      username: '${GRAFANA_REMOTE_WRITE_USERNAME}'
+      password: '${GRAFANA_REMOTE_WRITE_PASSWORD}'

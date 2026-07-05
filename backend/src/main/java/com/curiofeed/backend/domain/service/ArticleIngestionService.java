@@ -4,6 +4,9 @@ import com.curiofeed.backend.api.dto.admin.RegisterArticleRequest;
 import com.curiofeed.backend.api.dto.admin.RegisterArticleResponse;
 import com.curiofeed.backend.domain.entity.*;
 import com.curiofeed.backend.domain.repository.*;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ArticleIngestionService {
@@ -21,6 +25,7 @@ public class ArticleIngestionService {
     private final ArticleGenerationStepJobRepository stepJobRepository;
     private final CategoryRepository categoryRepository;
     private final SlugGenerator slugGenerator;
+    private final MeterRegistry meterRegistry;
 
     public ArticleIngestionService(
             ArticleRepository articleRepository,
@@ -28,13 +33,15 @@ public class ArticleIngestionService {
             ArticleGenerationSubJobRepository subJobRepository,
             ArticleGenerationStepJobRepository stepJobRepository,
             CategoryRepository categoryRepository,
-            SlugGenerator slugGenerator) {
+            SlugGenerator slugGenerator,
+            MeterRegistry meterRegistry) {
         this.articleRepository = articleRepository;
         this.jobRepository = jobRepository;
         this.subJobRepository = subJobRepository;
         this.stepJobRepository = stepJobRepository;
         this.categoryRepository = categoryRepository;
         this.slugGenerator = slugGenerator;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -43,6 +50,19 @@ public class ArticleIngestionService {
      */
     @Transactional
     public RegisterArticleResponse register(RegisterArticleRequest request) {
+        long startTimeMs = System.currentTimeMillis();
+        try {
+            return doRegister(request, startTimeMs);
+        } catch (ArticleAlreadyExistsException e) {
+            recordIngestionMetric("duplicate", System.currentTimeMillis() - startTimeMs);
+            throw e;
+        } catch (RuntimeException e) {
+            recordIngestionMetric("error", System.currentTimeMillis() - startTimeMs);
+            throw e;
+        }
+    }
+
+    private RegisterArticleResponse doRegister(RegisterArticleRequest request, long startTimeMs) {
         // 1. 중복 확인
         Optional<Article> existing = articleRepository.findBySourceUrl(request.sourceUrl());
         if (existing.isPresent()) {
@@ -72,14 +92,26 @@ public class ArticleIngestionService {
         for (DifficultyLevel level : List.of(DifficultyLevel.EASY, DifficultyLevel.MEDIUM, DifficultyLevel.HARD)) {
             ArticleGenerationSubJob subJob = new ArticleGenerationSubJob(job, level, JobStatus.PENDING);
             subJobRepository.save(subJob);
-            // Pre-create all 3 step jobs so the Admin UI shows them immediately.
-            // The worker uses these if they exist, or creates them if somehow missing (idempotent).
             for (GenerationStepType stepType : GenerationStepType.values()) {
                 stepJobRepository.save(ArticleGenerationStepJob.pending(subJob, stepType));
             }
         }
 
+        recordIngestionMetric("registered", System.currentTimeMillis() - startTimeMs);
         return new RegisterArticleResponse(article.getId(), job.getId(), JobStatus.PENDING.name());
+    }
+
+    private void recordIngestionMetric(String status, long durationMs) {
+        if (meterRegistry != null) {
+            Counter.builder("curiofeed.ingestion.articles")
+                    .tag("status", status)
+                    .register(meterRegistry)
+                    .increment();
+            Timer.builder("curiofeed.ingestion.duration")
+                    .tag("status", status)
+                    .register(meterRegistry)
+                    .record(durationMs, TimeUnit.MILLISECONDS);
+        }
     }
 
     private Article createArticle(RegisterArticleRequest req, Category category, String slug) {

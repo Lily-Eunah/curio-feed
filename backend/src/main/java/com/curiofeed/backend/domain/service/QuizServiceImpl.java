@@ -6,6 +6,8 @@ import com.curiofeed.backend.domain.entity.Quiz;
 import com.curiofeed.backend.domain.model.QuizEvaluationResult;
 import com.curiofeed.backend.domain.model.QuizSubmission;
 import com.curiofeed.backend.domain.repository.QuizRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.UUID;
 public class QuizServiceImpl implements QuizService {
 
     private final QuizRepository quizRepository;
+    private final MeterRegistry meterRegistry;
 
     @Override
     public QuizAttemptResponse attemptQuiz(UUID articleId, UUID contentId, UUID quizId, QuizAttemptRequest request) {
@@ -35,6 +38,13 @@ public class QuizServiceImpl implements QuizService {
                 .build();
 
         QuizEvaluationResult result = quiz.evaluate(submission);
+
+        if (meterRegistry != null) {
+            Counter.builder("curiofeed.quiz.attempts")
+                    .tag("result", result.isCorrect() ? "correct" : "incorrect")
+                    .register(meterRegistry)
+                    .increment();
+        }
 
         return QuizAttemptResponse.builder()
                 .isCorrect(result.isCorrect())

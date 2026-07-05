@@ -1,6 +1,9 @@
 package com.curiofeed.backend.infrastructure.llm;
 
 import com.curiofeed.backend.config.GeminiProperties;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
@@ -10,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 public class GeminiLlmClient implements LlmClient {
 
@@ -35,12 +39,18 @@ public class GeminiLlmClient implements LlmClient {
     private final String model;
     private final Double temperature;
     private final RestClient restClient;
+    private final MeterRegistry meterRegistry;
 
     public GeminiLlmClient(GeminiProperties properties, String model, RestClient.Builder restClientBuilder) {
+        this(properties, model, restClientBuilder, null);
+    }
+
+    public GeminiLlmClient(GeminiProperties properties, String model, RestClient.Builder restClientBuilder, MeterRegistry meterRegistry) {
         this.apiKey = properties.apiKey();
         this.model = model;
         this.temperature = properties.temperature();
         this.restClient = restClientBuilder.baseUrl(BASE_URL).build();
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -55,6 +65,7 @@ public class GeminiLlmClient implements LlmClient {
             try {
                 return doGenerate(prompt, schema);
             } catch (RateLimitException e) {
+                recordRateLimitHit();
                 if (attempt > MAX_RATE_LIMIT_RETRIES) {
                     throw new LlmClientException(
                             "Gemini rate limit exceeded after " + MAX_RATE_LIMIT_RETRIES + " retries (model=" + model + ")");
@@ -66,6 +77,30 @@ public class GeminiLlmClient implements LlmClient {
             }
         }
         throw new LlmClientException("Gemini generate unreachable");
+    }
+
+    private void recordRateLimitHit() {
+        if (meterRegistry != null) {
+            Counter.builder("curiofeed.llm.gemini.ratelimit.hits")
+                    .tag("model", model)
+                    .register(meterRegistry)
+                    .increment();
+        }
+    }
+
+    private void recordRequestMetric(String status, long durationMs) {
+        if (meterRegistry != null) {
+            Counter.builder("curiofeed.llm.gemini.requests")
+                    .tag("status", status)
+                    .tag("model", model)
+                    .register(meterRegistry)
+                    .increment();
+            Timer.builder("curiofeed.llm.gemini.duration")
+                    .tag("status", status)
+                    .tag("model", model)
+                    .register(meterRegistry)
+                    .record(durationMs, TimeUnit.MILLISECONDS);
+        }
     }
 
     private void enforceRateLimit() {
@@ -98,6 +133,7 @@ public class GeminiLlmClient implements LlmClient {
                 config
         );
 
+        long startTimeMs = System.currentTimeMillis();
         try {
             GeminiResponse response = restClient.post()
                     .uri(builder -> builder
@@ -123,11 +159,17 @@ public class GeminiLlmClient implements LlmClient {
             if (parts == null || parts.isEmpty()) {
                 throw new LlmClientException("Gemini call failed: no content parts");
             }
+            recordRequestMetric("success", System.currentTimeMillis() - startTimeMs);
             return parts.get(0).text();
 
-        } catch (RateLimitException | LlmClientException e) {
+        } catch (RateLimitException e) {
+            recordRequestMetric("rate_limited", System.currentTimeMillis() - startTimeMs);
+            throw e;
+        } catch (LlmClientException e) {
+            recordRequestMetric("error", System.currentTimeMillis() - startTimeMs);
             throw e;
         } catch (RestClientException e) {
+            recordRequestMetric("error", System.currentTimeMillis() - startTimeMs);
             throw new LlmClientException("Gemini call failed: " + e.getMessage(), e);
         }
     }

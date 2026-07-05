@@ -53,3 +53,16 @@ ai:
       EASY: 0.65
       MEDIUM: 0.70
       HARD: 0.80
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: curio-feed-backend
+

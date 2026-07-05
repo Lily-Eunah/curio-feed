@@ -41,5 +41,21 @@ services:
       - backend
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: curio-feed-prometheus
+    environment:
+      - GRAFANA_REMOTE_WRITE_URL=${GRAFANA_REMOTE_WRITE_URL}
+      - GRAFANA_REMOTE_WRITE_USERNAME=${GRAFANA_REMOTE_WRITE_USERNAME}
+      - GRAFANA_REMOTE_WRITE_PASSWORD=${GRAFANA_REMOTE_WRITE_PASSWORD}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--enable-feature=envsubst'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
