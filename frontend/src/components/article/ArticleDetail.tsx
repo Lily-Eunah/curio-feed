@@ -70,9 +70,10 @@ export default function ArticleDetail({
 
   // Pause audio when level changes or component unmounts
   useEffect(() => {
+    const audioEl = audioRef.current;
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
+      if (audioEl) {
+        audioEl.pause();
       }
     };
   }, [articleId]);
