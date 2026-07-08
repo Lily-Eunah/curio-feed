@@ -24,6 +24,12 @@ spring:
     virtual:
       enabled: true
 
+admin:
+  api:
+    # Shared token required in the X-Admin-Token header for /api/admin/** endpoints.
+    # Fail-closed: when unset, all admin requests are rejected with 503.
+    token: ${ADMIN_API_TOKEN:}
+
 ai:
   # Set to "gemini" to use Google Gemini API, or "ollama" (default) for local Ollama
   provider: ${AI_PROVIDER:ollama}

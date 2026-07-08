@@ -9,6 +9,10 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      # Shared admin token — set the value in the Render dashboard (Environment tab).
+      # Without it, /api/admin/** returns 503 (fail-closed).
+      - key: ADMIN_API_TOKEN
+        sync: false
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
           name: curio-feed-db

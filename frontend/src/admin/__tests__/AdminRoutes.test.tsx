@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminRoutes from '../AdminRoutes';
+import { setAdminToken, clearAdminToken } from '../api/token';
+
+beforeEach(() => setAdminToken('test-token'));
+afterEach(() => clearAdminToken());
 
 function renderAtPath(path: string) {
   const queryClient = new QueryClient({

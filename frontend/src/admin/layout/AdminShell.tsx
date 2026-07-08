@@ -1,4 +1,12 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import {
+  getAdminToken,
+  setAdminToken,
+  clearAdminToken,
+  ADMIN_UNAUTHORIZED_EVENT,
+} from '../api/token';
+import AdminTokenGate from './AdminTokenGate';
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: DashboardIcon },
@@ -8,6 +16,34 @@ const NAV_ITEMS = [
 ] as const;
 
 export default function AdminShell() {
+  const [token, setToken] = useState<string>(() => getAdminToken());
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setToken('');
+      setInvalid(true);
+    };
+    window.addEventListener(ADMIN_UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(ADMIN_UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
+
+  const handleTokenSubmit = (value: string) => {
+    setAdminToken(value);
+    setToken(value);
+    setInvalid(false);
+  };
+
+  const handleSignOut = () => {
+    clearAdminToken();
+    setToken('');
+    setInvalid(false);
+  };
+
+  if (!token) {
+    return <AdminTokenGate onSubmit={handleTokenSubmit} invalid={invalid} />;
+  }
+
   return (
     <div className="admin-app-shell flex min-h-screen bg-gray-50 text-slate-950" style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
       {/* Sidebar */}
@@ -47,8 +83,23 @@ export default function AdminShell() {
           ))}
         </nav>
 
-        <div className="border-t border-slate-700 px-6 py-4">
-          <p className="text-xs text-slate-400">CurioFeed v0.1</p>
+        <div className="border-t border-slate-700 px-6 py-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p className="text-xs text-slate-400" style={{ fontSize: '12px', color: '#94a3b8' }}>CurioFeed v0.1</p>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '12px',
+              cursor: 'pointer',
+              padding: 0,
+              textDecoration: 'underline',
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 

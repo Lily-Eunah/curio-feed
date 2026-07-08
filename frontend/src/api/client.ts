@@ -29,8 +29,10 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers,
     ...init,
+    // Merge caller-supplied headers over the computed defaults so callers can add
+    // headers (e.g. X-Admin-Token) without dropping Content-Type.
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
   if (!res.ok) {
     const body: ApiErrorBody = await res

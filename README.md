@@ -5,6 +5,10 @@ CurioFeed is a content-driven English learning platform that enables users to im
 
 By strategically transforming complex articles into optimized learning tiers, CurioFeed bridges the gap between high-level editorial content and individual linguistic capabilities, creating a seamless flow from curiosity to fluency.
 
+**🔗 Live Demo: [curio-feed.pages.dev](https://curio-feed.pages.dev)**
+
+> CurioFeed is designed as a **mobile-first reading experience** — for the best impression, open the demo on a phone or a narrow browser window. On wide screens the app renders inside a centered device frame.
+
 ## 🌟 Key Features
 
 * **Curated Learning Feed**: A hand-picked selection of high-quality articles across Tech, Business, and Culture—ensuring users learn from the best sources.
@@ -17,20 +21,38 @@ By strategically transforming complex articles into optimized learning tiers, Cu
 
 This project is structured as a monorepo with clear separation between frontend, backend, and infrastructure components.
 
-### Backend
-- Java 17
-- Spring Boot 3.x
-- Spring Data JPA
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Java 21, Spring Boot 3.2, Spring Data JPA, Flyway (migrations) |
+| **Frontend** | React 18 + Vite, TypeScript, Tailwind CSS, TanStack Query |
+| **AI / Media** | Google Gemini API (content generation), Google Cloud Text-to-Speech (TTS) |
+| **Data** | PostgreSQL (JSONB for flexible quiz schemas; UUID v7 for time-ordered cursor pagination) |
+| **Testing** | JUnit 5, Testcontainers (`postgres:16`), Vitest + Testing Library |
+| **Observability** | Spring Actuator, Micrometer → Prometheus / Grafana Cloud |
+| **Infra** | Docker, Docker Compose |
 
-### Frontend
-- React (Vite)
-- TypeScript
-- Tailwind CSS
+## 🤖 AI Content Pipeline
 
-### Infrastructure
-- Docker
-- Docker Compose
-- PostgreSQL (primary relational database, JSONB used for flexible quiz data)
+Every source article is transformed into three reading levels (**EASY / MEDIUM / HARD**), and each level runs through a tracked, resumable 4-step generation pipeline:
+
+```mermaid
+flowchart LR
+    SRC[Source Article] --> SD[SOURCE_DIGEST]
+    SD --> C[CONTENT]
+    C --> V[VOCABULARY]
+    C --> Q[QUIZ]
+    V --> Q
+    Q --> PUB[(Published: 3 levels + TTS)]
+```
+
+The pipeline is built to run as an **operable system**, not a one-shot prompt:
+
+- **Job tracking** — one `ArticleGenerationJob` per article → one `SubJob` per difficulty level → per-step `StepJob` records.
+- **Step-level retries** — any step (CONTENT / VOCABULARY / QUIZ) can be re-run independently; retrying an upstream step invalidates dependent steps.
+- **Validation & quality scoring** — generated content is validated (e.g. title-similarity, level-appropriate score thresholds) before a level is published.
+- **Pre-generated multimodal assets** — TTS audio is generated and cached per level for instant playback.
+
+A protected admin console (`/admin`) exposes this pipeline: article ingestion, per-step status, and manual retries.
 
 
 ## 🚦 How to run locally
@@ -45,56 +67,45 @@ The entire stack is containerized for easy local development.
    ```
 3. Access Services:
    - **Frontend**: http://localhost:3000
-   - **Backend API Docs (Swagger)**: http://localhost:8080/swagger-ui.html
+   - **Backend API**: http://localhost:8080 (health check at `/actuator/health`)
+   - **Admin console**: http://localhost:3000/admin — set `ADMIN_API_TOKEN` in `infra/.env` (see `infra/.env.example`) and enter it when prompted.
 
 
 
 ## 🚀 Production Deployment
 
-Curio Feed is configured for production deployment using the following architecture:
-- **Frontend**: Hosted on **Cloudflare Pages** (Vite + React + TS) for global CDN delivery, security, and edge performance.
-- **Backend**: Deployed on **Oracle Cloud Always Free VM** running a Docker container, reverse-proxied by **Caddy** (with automatic Let's Encrypt SSL/TLS certificates).
-- **Database**: Run on **Neon PostgreSQL** (serverless database for low-overhead production traffic).
+The live demo runs on a managed, low-cost stack:
 
-For detailed instructions, step-by-step setup guides, and validation checklists, refer to the following documents:
-* [**Phase 1 Deployment & Verification Guide (Domain-less)**](docs/DEPLOYMENT_PHASE1.md): Steps to verify the integration between Cloudflare Pages and the Oracle Cloud VM using Cloudflare Quick Tunnels before purchasing a domain.
-* [**Full Infrastructure & Deployment Plan**](implementation_plan.md): The comprehensive architectural blueprint, system settings (JPA, Hikari, JVM memory limits), and Phase 1/Phase 2 details.
+- **Frontend**: **Cloudflare Pages** (global CDN + edge delivery). API base URL is injected at build time via `VITE_API_BASE_URL`.
+- **Backend**: containerized Spring Boot service on **Render** (`render.yaml`), with a managed PostgreSQL instance.
+- **Admin API security**: `/api/admin/**` is guarded by a shared token — set `ADMIN_API_TOKEN` in the backend environment and supply it via the `X-Admin-Token` header (the admin console prompts for it). When unset, the admin API is fail-closed (returns `503`).
 
-### Quick Deployment on VM
-A helper deployment script is provided at `infra/deploy.sh`. To deploy updates to your Oracle VM:
-1. Clone the repository to `/opt/curiofeed` on your VM.
-2. Set up the production database connection parameters and CORS origins in `/opt/curiofeed/infra/.env` (see `infra/.env.example`).
-3. Run the script:
-   ```bash
-   chmod +x infra/deploy.sh
-   ./infra/deploy.sh
-   ```
-This will automatically pull the latest `main` branch, build/re-create the container, prune unused Docker assets to conserve disk space, and check the container status.
+> A self-hosted alternative (Oracle Cloud Always Free VM + Caddy + Neon PostgreSQL) is documented in [`docs/DEPLOYMENT_PHASE1.md`](docs/DEPLOYMENT_PHASE1.md) and the [full infrastructure plan](implementation_plan.md).
 
+## 📐 Design Decisions
 
-## 📚 Engineering Deep-Dives
-I document the architectural "Why" to share my thought process and engineering journey.
+Some of the architectural "why" behind CurioFeed:
 
-* [**ADR-001: Choosing Java 17 for Long-term Stability**](#)
-* [**Optimizing AI API Costs with Content Caching**](#)
-* [**Designing Flexible Quiz Schemas using PostgreSQL JSONB**](#)
+- **Java 21 + Spring Boot 3.2** — virtual threads for cheap concurrency in the generation pipeline, and a long-support baseline.
+- **Content caching over on-the-fly generation** — all three reading levels and their TTS audio are pre-generated and cached, so the read/listen experience is instant and LLM/TTS cost is bounded and predictable.
+- **PostgreSQL JSONB for quiz schemas** — multiple-choice, short-answer, and scramble quizzes share one flexible column instead of rigid per-type tables.
+- **UUID v7 + cursor pagination** — time-ordered IDs make `(published_at, id)` cursors stable without a separate sort key.
 
-## 🗺 Future Roadmap
+## 🗺 Roadmap
 
-### Engineering & Infrastructure
-- Introduce asynchronous processing for AI-based content transformation and TTS generation
-- Improve monitoring and metrics collection for API performance and AI usage
-- Evolve deployment strategy toward cloud-managed infrastructure
+**Done**
+- ✅ Tri-level (Easy/Medium/Hard) LLM content pipeline with step-level retries
+- ✅ Pre-generated, cached TTS audio per level
+- ✅ Metrics & observability (Prometheus / Grafana Cloud)
+- ✅ Token-protected admin console
 
-### Intelligent Learning Features
-- Implement a spaced repetition system (SRS) for vocabulary retention
-- Develop personalized content recommendations based on reading behavior
-- Provide progress analytics for comprehension and vocabulary growth
-
-### Multimodal Enhancements
-- Automate TTS generation pipeline
+**Next**
+- Spaced repetition system (SRS) for vocabulary retention
+- Personalized recommendations based on reading behavior
+- Progress analytics for comprehension and vocabulary growth
+- Fully asynchronous generation pipeline (queue-based)
 
 ## 🤝 Contact
-Lily (Eunah Yang) - Software Developer at Samsung Electronics
+Lily (Eunah Yang) — Software Engineer at Samsung Electronics
 LinkedIn: [Eunah Yang](https://www.linkedin.com/in/eunah-yang-3a86553a4/)
 Email: yua12271109@gmail.com
