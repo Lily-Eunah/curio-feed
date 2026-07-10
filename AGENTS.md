@@ -14,6 +14,8 @@ frontend/   React 18 + Vite + TypeScript + Tailwind (MVP shell only)
 infra/      docker-compose.yml wiring all three services
 ```
 
+백엔드 상세(명령·아키텍처·테스트·DB 마이그레이션)는 [`backend/AGENTS.md`](backend/AGENTS.md).
+
 ## Running locally
 
 **Start the database** (required for backend):
@@ -39,31 +41,6 @@ npm run lint     # eslint with zero-warnings policy
 **Full stack via Docker** (from `infra/`):
 ```bash
 docker compose up --build   # backend -> :8080, frontend -> :3000
-```
-
-## Backend commands
-
-```bash
-./gradlew build
-./gradlew test                 # all tests (requires Docker for Testcontainers)
-./gradlew test --tests "com.curiofeed.backend.domain.repository.ArticleFeedRepositoryTest"
-```
-
-## Architecture
-
-Spring Boot 3.2 + Java 21 + PostgreSQL + Flyway.
-
-```
-com.curiofeed.backend
-├── api
-│   ├── controller/          # REST controllers + GlobalExceptionHandler
-│   └── dto/                 # Request/response DTOs
-├── config/                  # JpaConfig (JPA auditing)
-└── domain
-    ├── entity/              # JPA entities
-    ├── model/               # Non-entity domain models (QuizSubmission, QuizOptions, ...)
-    ├── repository/          # Spring Data JPA repositories
-    └── service/             # Business logic (interfaces + Impl)
 ```
 
 ## 프로젝트 도메인 규칙 (curio-feed 고유)
