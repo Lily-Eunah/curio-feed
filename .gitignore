@@ -13,12 +13,8 @@ out/
 design/
 reference/
 
-# AI Instructions & Agents (Untracked)
+# AI agent local state (settings/sessions/local). Instruction .md files (AGENTS/CLAUDE/GEMINI) ARE tracked.
 .claude/
-CLAUDE.md
-GEMINI.md
-CODEX.md
-AGENTS.md
 .gemini/
 .codex/
 
