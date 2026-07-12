@@ -5,7 +5,7 @@ import PageHeader from '../components/PageHeader';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import StatusBadge from '../components/StatusBadge';
-import SubJobTable from '../components/SubJobTable';
+import VerticalPipelineCard from '../components/VerticalPipelineCard';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import { getGenerationStatus, getAdminArticleDetail } from '../api/client';
@@ -31,13 +31,6 @@ function getOverallStatus(data: GenerationStatusResponse | undefined) {
   return 'PENDING';
 }
 
-function getLevelProgressInfo(subJobs: any[], level: 'EASY' | 'MEDIUM' | 'HARD') {
-  const subJob = subJobs.find((s) => s.level === level);
-  if (!subJob) {
-    return { status: 'PENDING', retryCount: 0 };
-  }
-  return { status: subJob.status, retryCount: subJob.retryCount };
-}
 
 export default function GenerationStatusPage() {
   const { articleId } = useParams<{ articleId: string }>();
@@ -58,73 +51,12 @@ export default function GenerationStatusPage() {
     enabled: !!articleId,
   });
 
-  const subJobs = statusData?.job?.subJobs || [];
   const overallStatus = getOverallStatus(statusData);
 
   const formatCheckedTime = () => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   };
 
-  const renderProgressCircle = (level: 'EASY' | 'MEDIUM' | 'HARD') => {
-    const { status, retryCount } = getLevelProgressInfo(subJobs, level);
-
-    if (status === 'COMPLETED') {
-      return (
-        <div className="flex flex-col items-center justify-center">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{level}</span>
-          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-50 text-green-500 border-2 border-green-500 shadow-sm mb-2">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <span className="text-xs font-bold text-green-600 uppercase tracking-wide">Completed</span>
-          <span className="text-[11px] text-gray-400 mt-1">Retry Count {retryCount}</span>
-        </div>
-      );
-    }
-
-    if (status === 'RUNNING' || status === 'PROCESSING') {
-      return (
-        <div className="flex flex-col items-center justify-center">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{level}</span>
-          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 text-blue-500 border-2 border-blue-500 shadow-sm mb-2 relative">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">Running</span>
-          <span className="text-[11px] text-gray-400 mt-1">Retry Count {retryCount}</span>
-        </div>
-      );
-    }
-
-    if (status === 'FAILED') {
-      return (
-        <div className="flex flex-col items-center justify-center">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{level}</span>
-          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-50 text-red-500 border-2 border-red-500 shadow-sm mb-2">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-          <span className="text-xs font-bold text-red-600 uppercase tracking-wide">Failed</span>
-          <span className="text-[11px] text-gray-400 mt-1">Retry Count {retryCount}</span>
-        </div>
-      );
-    }
-
-    // PENDING / READY
-    return (
-      <div className="flex flex-col items-center justify-center">
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{level}</span>
-        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gray-50 text-gray-400 border-2 border-gray-200 shadow-sm mb-2">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Pending</span>
-        <span className="text-[11px] text-gray-400 mt-1">Retry Count {retryCount}</span>
-      </div>
-    );
-  };
 
   const isError = statusError;
   const isLoading = statusLoading || detailLoading;
@@ -190,39 +122,25 @@ export default function GenerationStatusPage() {
             </div>
           </Card>
 
-          {/* Generation Progress Card */}
-          <Card>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6">
-              Generation Progress
-            </h3>
-            <div className="grid grid-cols-3 gap-4 border-t border-b border-gray-100 py-6 my-2 bg-gray-50/30 rounded-lg">
-              {renderProgressCircle('EASY')}
-              {renderProgressCircle('MEDIUM')}
-              {renderProgressCircle('HARD')}
-            </div>
-          </Card>
-
-          {/* Sub Jobs Table Card */}
-          <Card>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
-              Sub Jobs
-            </h3>
-            {statusData.job ? (
-              <SubJobTable
-                subJobs={statusData.job.subJobs}
-                articleId={statusData.articleId}
-                jobId={statusData.job.jobId}
-                onRetrySuccess={(level) => {
-                  setRetryModalLevel(level);
-                  refetch();
-                }}
-              />
-            ) : (
-              <div className="py-6 text-center text-sm text-gray-400 font-medium">
-                No active background jobs found for this article.
-              </div>
-            )}
-          </Card>
+          {/* Vertical Pipeline Steppers */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(['EASY', 'MEDIUM', 'HARD'] as const).map((level) => {
+              const subJob = statusData.job?.subJobs.find((s) => s.level === level);
+              return (
+                <VerticalPipelineCard
+                  key={level}
+                  level={level}
+                  subJob={subJob}
+                  articleId={statusData.articleId}
+                  jobId={statusData.job?.jobId}
+                  onRetrySuccess={(retryLevel) => {
+                    setRetryModalLevel(retryLevel);
+                    refetch();
+                  }}
+                />
+              );
+            })}
+          </div>
         </>
       )}
 

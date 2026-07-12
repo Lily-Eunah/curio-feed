@@ -1,7 +1,7 @@
 export type JobStatus = 'PENDING' | 'PROCESSING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 export type ArticleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type DifficultyLevel = 'EASY' | 'MEDIUM' | 'HARD';
-export type GenerationStepType = 'CONTENT' | 'VOCABULARY' | 'QUIZ';
+export type GenerationStepType = 'SOURCE_DIGEST' | 'CONTENT' | 'VOCABULARY' | 'QUIZ';
 
 export interface StepJobInfo {
   stepJobId: string;
