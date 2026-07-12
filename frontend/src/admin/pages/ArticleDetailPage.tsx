@@ -115,16 +115,22 @@ function ParsedBody({ text, vocabularies }: { text: string; vocabularies: AdminV
 }
 
 // Parses JSON or split-semicolon options list
-function parseQuizOptions(optionsStr: string): string[] {
+function parseQuizOptions(options: any): string[] {
+  if (Array.isArray(options)) {
+    return options;
+  }
+  if (typeof options !== 'string') {
+    return [];
+  }
   try {
-    const parsed = JSON.parse(optionsStr);
+    const parsed = JSON.parse(options);
     if (Array.isArray(parsed)) return parsed;
   } catch {
     // ignore and fallback
   }
-  if (!optionsStr) return [];
-  return optionsStr.split(';').map((s) => s.trim()).filter(Boolean);
+  return options.split(';').map((s) => s.trim()).filter(Boolean);
 }
+
 
 // Renders individual quiz review items
 function QuizReviewItem({ quiz, index }: { quiz: AdminQuizInfo; index: number }) {
