@@ -54,7 +54,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'ollama', 'external', 'pending'
+        excludeTags 'ollama', 'external', 'pending', 'eval'
     }
 
     testLogging {
@@ -84,6 +84,17 @@ tasks.named('test') {
     // 위 설정과 같이 부여 (중요)
     environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
 
+}
+
+// Prompt Regression Evaluation task against Golden Dataset.
+tasks.register('evalRegression', Test) {
+    description = 'Runs prompt regression evaluation against the Golden Dataset.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    jvmArgs "-Dfile.encoding=UTF-8"
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
 }
 
 // Ollama legacy external tests — not part of default build.

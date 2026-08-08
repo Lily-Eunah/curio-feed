@@ -9,4 +9,8 @@ public interface LlmClient {
     default String generate(String prompt, Map<String, Object> schema) {
         return generate(prompt);
     }
+
+    default String getModelName() {
+        return "unknown";
+    }
 }

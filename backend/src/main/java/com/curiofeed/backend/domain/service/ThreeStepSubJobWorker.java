@@ -5,6 +5,7 @@ import com.curiofeed.backend.domain.model.GenerationResult;
 import com.curiofeed.backend.domain.repository.*;
 import com.curiofeed.backend.infrastructure.llm.*;
 import com.curiofeed.backend.infrastructure.llm.validation.*;
+import com.curiofeed.backend.infrastructure.llm.validation.safety.CompositeSafetyFilter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -68,6 +69,8 @@ public class ThreeStepSubJobWorker {
     private final VocabLemmatizer vocabLemmatizer;
     private final TitleSimilarityValidator titleSimilarityValidator;
 
+    private final CompositeSafetyFilter safetyFilter;
+    private final QualityScorer qualityScorer;
     private final GenerationResultSaver resultSaver;
     private final ArticleStatusAggregator aggregator;
 
@@ -89,6 +92,8 @@ public class ThreeStepSubJobWorker {
             QuizStepValidator quizValidator,
             VocabLemmatizer vocabLemmatizer,
             TitleSimilarityValidator titleSimilarityValidator,
+            CompositeSafetyFilter safetyFilter,
+            QualityScorer qualityScorer,
             GenerationResultSaver resultSaver,
             ArticleStatusAggregator aggregator) {
         this.lockService = lockService;
@@ -108,6 +113,8 @@ public class ThreeStepSubJobWorker {
         this.quizValidator = quizValidator;
         this.vocabLemmatizer = vocabLemmatizer;
         this.titleSimilarityValidator = titleSimilarityValidator;
+        this.safetyFilter = safetyFilter;
+        this.qualityScorer = qualityScorer;
         this.resultSaver = resultSaver;
         this.aggregator = aggregator;
     }
@@ -287,11 +294,23 @@ public class ThreeStepSubJobWorker {
                     }
                 }
 
+                // Safety Filter Check (PII, Toxicity, Copyright 5-gram copying)
+                List<String> safetyViolations = safetyFilter.validate(content, sourceText);
+                if (!safetyViolations.isEmpty()) {
+                    String safetyErrorMsg = String.join("; ", safetyViolations);
+                    log.warn("[subJob={} level={}] Safety violations detected: {}", subJobId, level, safetyErrorMsg);
+                    if (attempt < MAX_STEP_RETRIES) continue;
+                    markStepFailed(step, subJob, "SAFETY_VIOLATION", safetyErrorMsg, safetyErrorMsg);
+                    return null;
+                }
+
                 log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_START", subJobId, attempt);
                 resultSaver.saveContent(articleId, level, content);
                 log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
-                step.markCompleted(validationResult.getStatus() != ContentValidationResult.ValidationStatus.VALID ? "PASS_WITH_WARNINGS" : "PASS");
+                double contentQualityScore = qualityScorer.score(new GenerationResult(content, null, null, null, null));
+                String vStatus = validationResult.getStatus() != ContentValidationResult.ValidationStatus.VALID ? "PASS_WITH_WARNINGS" : "PASS";
+                step.markCompleted(vStatus, promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), contentQualityScore);
                 stepJobRepository.save(step);
                 log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
@@ -358,7 +377,7 @@ public class ThreeStepSubJobWorker {
                     log.warn("[subJob={}] Title still too similar after {} attempts — proceeding best-effort", subJobId, attempt);
                 }
 
-                step.markCompleted(similarTitle ? "PASS_WITH_WARNINGS" : "PASS");
+                step.markCompleted(similarTitle ? "PASS_WITH_WARNINGS" : "PASS", promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), null);
                 stepJobRepository.save(step);
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms",
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
@@ -466,7 +485,7 @@ public class ThreeStepSubJobWorker {
                 resultSaver.saveVocab(articleId, level, vocabs, vocabLemmatizer);
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
-                step.markCompleted(errStr != null ? "PASS_WITH_WARNINGS" : "PASS");
+                step.markCompleted(errStr != null ? "PASS_WITH_WARNINGS" : "PASS", promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), null);
                 stepJobRepository.save(step);
                 log.info("[diagnostics] subJob={} step=VOCABULARY attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms",
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
@@ -553,7 +572,7 @@ public class ThreeStepSubJobWorker {
                         resultSaver.saveQuiz(articleId, level, result.quizzes());
                         log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
-                        step.markCompleted("PASS_WITH_WARNINGS");
+                        step.markCompleted("PASS_WITH_WARNINGS", promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), null);
                         stepJobRepository.save(step);
                         log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
                                 subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());
@@ -565,7 +584,7 @@ public class ThreeStepSubJobWorker {
                 resultSaver.saveQuiz(articleId, level, result.quizzes());
                 log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
-                step.markCompleted("PASS");
+                step.markCompleted("PASS", promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), null);
                 stepJobRepository.save(step);
                 log.info("[diagnostics] subJob={} step=QUIZ attempt={} event=STATUS_UPDATE_COMPLETE total_duration={}ms", 
                         subJobId, attempt, Instant.now().toEpochMilli() - start.toEpochMilli());

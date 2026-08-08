@@ -19,6 +19,12 @@ import java.util.Map;
 @Component
 public class ThreeStepPromptBuilder {
 
+    public static final String PROMPT_VERSION = "v3.0";
+
+    public String getPromptVersion() {
+        return PROMPT_VERSION;
+    }
+
     // ── Step 1: Content ───────────────────────────────────────────────────────
 
     public String buildSourceDigestPrompt(String originalTitle, String originalArticle) {

@@ -58,6 +58,14 @@ public class ArticleGenerationStepJob extends BaseEntity {
     @Column(length = 50)
     private String failureReason;
 
+    @Column(length = 50)
+    private String promptVersion;
+
+    @Column(length = 100)
+    private String modelName;
+
+    private Double qualityScore;
+
     public static ArticleGenerationStepJob pending(ArticleGenerationSubJob subJob, GenerationStepType stepType) {
         var step = new ArticleGenerationStepJob();
         step.subJob = subJob;
@@ -77,9 +85,16 @@ public class ArticleGenerationStepJob extends BaseEntity {
     }
 
     public void markCompleted(String validationStatus) {
+        markCompleted(validationStatus, null, null, null);
+    }
+
+    public void markCompleted(String validationStatus, String promptVersion, String modelName, Double qualityScore) {
         this.status = JobStatus.COMPLETED;
         this.completedAt = Instant.now();
         this.validationStatus = validationStatus;
+        this.promptVersion = promptVersion;
+        this.modelName = modelName;
+        this.qualityScore = qualityScore;
     }
 
     public void markSkipped(String reason) {

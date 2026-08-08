@@ -54,6 +54,11 @@ public class GeminiLlmClient implements LlmClient {
     }
 
     @Override
+    public String getModelName() {
+        return this.model;
+    }
+
+    @Override
     public String generate(String prompt) {
         return generate(prompt, null);
     }
