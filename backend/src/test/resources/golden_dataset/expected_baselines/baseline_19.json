@@ -1,0 +1,7 @@
+{
+  "minQualityScore": 0.65,
+  "minWordCount": 160,
+  "maxWordCount": 500,
+  "expectedVocabCount": 5,
+  "expectedQuizCount": 3
+}
