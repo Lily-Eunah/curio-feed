@@ -69,10 +69,10 @@ class LiveMultiArmBenchmarkRunnerTest {
         MistralProperties mistralProps = new MistralProperties(mistralApiKey, "mistral-small-2603", "ministral-8b-2410", "https://api.mistral.ai", 10, 120, 0.3);
         MistralLlmClient mistralClient = new MistralLlmClient(mistralProps, "mistral-small-2603", RestClient.builder());
 
-        GeminiProperties geminiProps = new GeminiProperties(geminiApiKey, "gemini-3.6-flash", "gemini-3.6-flash", 10, 120, 0.3);
-        GeminiLlmClient geminiClient = new GeminiLlmClient(geminiProps, "gemini-3.6-flash", RestClient.builder());
+        GeminiProperties geminiProps = new GeminiProperties(geminiApiKey, "gemini-2.5-flash", "gemini-2.5-flash", 10, 120, 0.3);
+        GeminiLlmClient geminiClient = new GeminiLlmClient(geminiProps, "gemini-2.5-flash", RestClient.builder());
 
-        // Independent LLM-as-Judge Client: Gemini 3.6 Flash evaluates Mistral & Gemini outputs
+        // Independent LLM-as-Judge Client: Gemini 2.5 Flash evaluates Mistral & Gemini outputs
         LlmClient judgeClient = geminiClient;
         String judgeModelName = judgeClient.getModelName();
 
@@ -92,20 +92,24 @@ class LiveMultiArmBenchmarkRunnerTest {
 
         // ── Arm C: Mistral Small 4 Metrics ──────────────────────────────────
         List<Double> mistralHeuristics = new ArrayList<>();
-        List<Double> mistralJudges = new ArrayList<>();
+        List<Double> mistralJudgesForCorrelation = new ArrayList<>();
+        List<Double> mistralHeuristicsForCorrelation = new ArrayList<>();
         Set<Double> mistralDistinctJudgeScores = new HashSet<>();
-        int mistralHardFailEvents = 0;       // Count of step-level hard failures (out of 60 steps)
-        int mistralCleanArticles = 0;        // Count of articles passing all 3 steps with zero hard fails
-        int mistralNetworkCompleted = 0;     // Count of articles completing HTTP API execution
-        int mistralJudgeParsingFailures = 0; // Count of judge parsing failures (no fallback to hScore)
+        int mistralHardFailEvents = 0;       // Step-level hard validation failures
+        int mistralCleanArticles = 0;        // Articles with zero hard failures across 3 steps
+        int mistralNetworkCompleted = 0;     // Articles completing full 3-step generation
+        int mistralJudgeNetworkFailures = 0; // Judge HTTP/Quota errors
+        int mistralJudgeParsingFailures = 0; // Judge JSON parsing errors
 
-        // ── Arm A: Gemini 2.5 Flash Metrics ──────────────────────────────────
+        // ── Arm A: Gemini 3.6 Flash Metrics ──────────────────────────────────
         List<Double> geminiHeuristics = new ArrayList<>();
-        List<Double> geminiJudges = new ArrayList<>();
+        List<Double> geminiJudgesForCorrelation = new ArrayList<>();
+        List<Double> geminiHeuristicsForCorrelation = new ArrayList<>();
         Set<Double> geminiDistinctJudgeScores = new HashSet<>();
         int geminiHardFailEvents = 0;
         int geminiCleanArticles = 0;
         int geminiNetworkCompleted = 0;
+        int geminiJudgeNetworkFailures = 0;
         int geminiJudgeParsingFailures = 0;
 
         log.info("Starting Empirical Multi-Arm Benchmark on N={} articles. Independent Judge: {}", totalN, judgeModelName);
@@ -161,48 +165,54 @@ class LiveMultiArmBenchmarkRunnerTest {
                 if (articleClean) mistralCleanArticles++;
                 mistralNetworkCompleted++;
 
-                // Full Heuristic Quality Score
+                // Full Heuristic Quality Score (Added ALWAYS for N=20)
                 GenerationResult fullResult = new GenerationResult(content, List.of(), vocabs, quizzes, null);
                 double hScore = qualityScorer.score(fullResult);
+                mistralHeuristics.add(hScore);
 
-                // Independent LLM-as-Judge Evaluation (Gemini 2.5 Flash evaluating Mistral)
-                String judgePrompt = evalPromptBuilder.buildEvaluationPrompt(article.originalContent(), content, level);
-                String judgeRaw = judgeClient.generate(judgePrompt, EvalPromptBuilder.evalSchema());
-                SemanticEvaluatorService.JudgeResult jResult = parser.parse(judgeRaw, SemanticEvaluatorService.JudgeResult.class);
+                // Dedicated Inner Try-Catch for LLM-as-Judge (Gemini 3.6 Flash evaluating Mistral)
+                try {
+                    String judgePrompt = evalPromptBuilder.buildEvaluationPrompt(article.originalContent(), content, level);
+                    String judgeRaw = judgeClient.generate(judgePrompt, EvalPromptBuilder.evalSchema());
+                    SemanticEvaluatorService.JudgeResult jResult = parser.parse(judgeRaw, SemanticEvaluatorService.JudgeResult.class);
 
-                if (jResult != null) {
-                    double jOverall = jResult.overall();
-                    mistralHeuristics.add(hScore);
-                    mistralJudges.add(jOverall);
-                    mistralDistinctJudgeScores.add(jOverall);
+                    if (jResult != null) {
+                        double jOverall = jResult.overall();
+                        mistralJudgesForCorrelation.add(jOverall);
+                        mistralHeuristicsForCorrelation.add(hScore);
+                        mistralDistinctJudgeScores.add(jOverall);
 
-                    persistedEvalScores.add(new PersistedEvalRecord(
-                            article.id(),
-                            mistralClient.getModelName(),
-                            judgeModelName,
-                            hScore,
-                            jResult.factualAccuracy(),
-                            jResult.levelAppropriateness(),
-                            jResult.engagement(),
-                            jResult.safety(),
-                            jOverall
-                    ));
+                        persistedEvalScores.add(new PersistedEvalRecord(
+                                article.id(),
+                                mistralClient.getModelName(),
+                                judgeModelName,
+                                hScore,
+                                jResult.factualAccuracy(),
+                                jResult.levelAppropriateness(),
+                                jResult.engagement(),
+                                jResult.safety(),
+                                jOverall
+                        ));
 
-                    log.info("[Arm C - Mistral] Article {} | Heuristic: {} | Judge ({}): {} [Fact: {}, Level: {}, Eng: {}, Safe: {}]",
-                            article.id(), String.format("%.4f", hScore), judgeModelName, String.format("%.4f", jOverall),
-                            String.format("%.2f", jResult.factualAccuracy()), String.format("%.2f", jResult.levelAppropriateness()),
-                            String.format("%.2f", jResult.engagement()), String.format("%.2f", jResult.safety()));
-                } else {
-                    mistralJudgeParsingFailures++;
-                    log.warn("[Arm C - Mistral] Article {} Judge parsing failed; omitted from r_s", article.id());
+                        log.info("[Arm C - Mistral] Article {} | Heuristic: {} | Judge ({}): {} [Fact: {}, Level: {}, Eng: {}, Safe: {}]",
+                                article.id(), String.format("%.4f", hScore), judgeModelName, String.format("%.4f", jOverall),
+                                String.format("%.2f", jResult.factualAccuracy()), String.format("%.2f", jResult.levelAppropriateness()),
+                                String.format("%.2f", jResult.engagement()), String.format("%.2f", jResult.safety()));
+                    } else {
+                        mistralJudgeParsingFailures++;
+                        log.warn("[Arm C - Mistral] Article {} Judge JSON parsing failed", article.id());
+                    }
+                } catch (Exception je) {
+                    mistralJudgeNetworkFailures++;
+                    log.warn("[Arm C - Mistral] Article {} Judge network call failed (429/quota): {}", article.id(), je.getMessage());
                 }
 
             } catch (Exception e) {
-                log.warn("[Arm C - Mistral] Article {} network execution failed: {}", article.id(), e.getMessage());
+                log.warn("[Arm C - Mistral] Article {} network generation failed: {}", article.id(), e.getMessage());
             }
 
             // ═════════════════════════════════════════════════════════════════
-            // 2. Arm A: Gemini 2.5 Flash (Full 3-Step Pipeline)
+            // 2. Arm A: Gemini 3.6 Flash (Full 3-Step Pipeline)
             // ═════════════════════════════════════════════════════════════════
             try {
                 boolean articleClean = true;
@@ -248,78 +258,91 @@ class LiveMultiArmBenchmarkRunnerTest {
                 if (articleClean) geminiCleanArticles++;
                 geminiNetworkCompleted++;
 
-                // Full Heuristic Quality Score
+                // Full Heuristic Quality Score (Added ALWAYS)
                 GenerationResult fullResult = new GenerationResult(content, List.of(), vocabs, quizzes, null);
                 double hScore = qualityScorer.score(fullResult);
+                geminiHeuristics.add(hScore);
 
-                // Independent LLM-as-Judge Evaluation (Gemini evaluating Gemini)
-                String judgePrompt = evalPromptBuilder.buildEvaluationPrompt(article.originalContent(), content, level);
-                String judgeRaw = judgeClient.generate(judgePrompt, EvalPromptBuilder.evalSchema());
-                SemanticEvaluatorService.JudgeResult jResult = parser.parse(judgeRaw, SemanticEvaluatorService.JudgeResult.class);
+                // Dedicated Inner Try-Catch for LLM-as-Judge (Gemini evaluating Gemini)
+                try {
+                    String judgePrompt = evalPromptBuilder.buildEvaluationPrompt(article.originalContent(), content, level);
+                    String judgeRaw = judgeClient.generate(judgePrompt, EvalPromptBuilder.evalSchema());
+                    SemanticEvaluatorService.JudgeResult jResult = parser.parse(judgeRaw, SemanticEvaluatorService.JudgeResult.class);
 
-                if (jResult != null) {
-                    double jOverall = jResult.overall();
-                    geminiHeuristics.add(hScore);
-                    geminiJudges.add(jOverall);
-                    geminiDistinctJudgeScores.add(jOverall);
+                    if (jResult != null) {
+                        double jOverall = jResult.overall();
+                        geminiJudgesForCorrelation.add(jOverall);
+                        geminiHeuristicsForCorrelation.add(hScore);
+                        geminiDistinctJudgeScores.add(jOverall);
 
-                    persistedEvalScores.add(new PersistedEvalRecord(
-                            article.id(),
-                            geminiClient.getModelName(),
-                            judgeModelName,
-                            hScore,
-                            jResult.factualAccuracy(),
-                            jResult.levelAppropriateness(),
-                            jResult.engagement(),
-                            jResult.safety(),
-                            jOverall
-                    ));
+                        persistedEvalScores.add(new PersistedEvalRecord(
+                                article.id(),
+                                geminiClient.getModelName(),
+                                judgeModelName,
+                                hScore,
+                                jResult.factualAccuracy(),
+                                jResult.levelAppropriateness(),
+                                jResult.engagement(),
+                                jResult.safety(),
+                                jOverall
+                        ));
 
-                    log.info("[Arm A - Gemini] Article {} | Heuristic: {} | Judge ({}): {}",
-                            article.id(), String.format("%.4f", hScore), judgeModelName, String.format("%.4f", jOverall));
-                } else {
-                    geminiJudgeParsingFailures++;
+                        log.info("[Arm A - Gemini] Article {} | Heuristic: {} | Judge ({}): {}",
+                                article.id(), String.format("%.4f", hScore), judgeModelName, String.format("%.4f", jOverall));
+                    } else {
+                        geminiJudgeParsingFailures++;
+                    }
+                } catch (Exception je) {
+                    geminiJudgeNetworkFailures++;
                 }
 
             } catch (Exception e) {
-                log.warn("[Arm A - Gemini] Article {} network execution failed: {}", article.id(), e.getMessage());
+                log.warn("[Arm A - Gemini] Article {} network generation failed: {}", article.id(), e.getMessage());
             }
         }
 
-        // ── Statistical & Metric Summaries ───────────────────────────────────
-        double[] mistralHArray = mistralHeuristics.stream().mapToDouble(Double::doubleValue).toArray();
-        double[] mistralJArray = mistralJudges.stream().mapToDouble(Double::doubleValue).toArray();
-        double rsMistral = (mistralHArray.length >= 3) ? SpearmanCorrelationCalculator.calculate(mistralHArray, mistralJArray) : 0.0;
+        // ── Statistical & Metric Summaries (Mathematically Correct Denominators) ──
+        double[] mistralHAll = mistralHeuristics.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] mistralHCorr = mistralHeuristicsForCorrelation.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] mistralJCorr = mistralJudgesForCorrelation.stream().mapToDouble(Double::doubleValue).toArray();
+        double rsMistral = (mistralHCorr.length >= 2) ? SpearmanCorrelationCalculator.calculate(mistralHCorr, mistralJCorr) : 0.0;
 
-        double[] geminiHArray = geminiHeuristics.stream().mapToDouble(Double::doubleValue).toArray();
-        double[] geminiJArray = geminiJudges.stream().mapToDouble(Double::doubleValue).toArray();
-        double rsGemini = (geminiHArray.length >= 3) ? SpearmanCorrelationCalculator.calculate(geminiHArray, geminiJArray) : 0.0;
+        double[] geminiHAll = geminiHeuristics.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] geminiHCorr = geminiHeuristicsForCorrelation.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] geminiJCorr = geminiJudgesForCorrelation.stream().mapToDouble(Double::doubleValue).toArray();
+        double rsGemini = (geminiHCorr.length >= 2) ? SpearmanCorrelationCalculator.calculate(geminiHCorr, geminiJCorr) : 0.0;
+
+        int mistralTotalSteps = mistralNetworkCompleted * 3;
+        int geminiTotalSteps = geminiNetworkCompleted * 3;
 
         System.out.println("\n====================================================================================================");
         System.out.println("            [EMPIRICAL MULTI-ARM BENCHMARK & SPEARMAN CORRELATION RESULTS (N=" + totalN + ")]");
         System.out.println("====================================================================================================");
         System.out.println(" Independent Judge Model : " + judgeModelName + " (Dynamic Resolution — No Self-Evaluation Bias)");
-        System.out.println(" Total Golden Articles   : " + totalN + " (Total Steps: " + (totalN * 3) + " steps per Arm)");
+        System.out.println(" Total Golden Articles   : " + totalN + " Golden Dataset Articles");
         System.out.println(" EvalScores Persisted    : " + persistedEvalScores.size() + " records registered for /api/admin/ab-compare");
         System.out.println("----------------------------------------------------------------------------------------------------");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Metric Category", "Arm C: Mistral Small 4", "Arm A: Gemini 3.6 Flash");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Metric Category", "Arm C: Mistral Small 4", "Arm A: Gemini 2.5 Flash");
         System.out.printf( " %-28s | %-32s | %-32s\n", "Model ID", mistralClient.getModelName(), geminiClient.getModelName());
         System.out.printf( " %-28s | %-32s | %-32s\n", "Completed Network Runs", mistralNetworkCompleted + " / " + totalN, geminiNetworkCompleted + " / " + totalN);
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Clean Articles (No Hard Fail)", mistralCleanArticles + " / " + totalN + " (" + String.format("%.1f", (double)mistralCleanArticles/totalN*100) + "%)", geminiCleanArticles + " / " + totalN + " (" + String.format("%.1f", (double)geminiCleanArticles/totalN*100) + "%)");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Step Hard Gate Failures", mistralHardFailEvents + " / " + (totalN * 3) + " steps (" + String.format("%.1f", (double)mistralHardFailEvents/(totalN*3)*100) + "%)", geminiHardFailEvents + " / " + (totalN * 3) + " steps (" + String.format("%.1f", (double)geminiHardFailEvents/(totalN*3)*100) + "%)");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Avg Heuristic Quality Score", String.format("%.4f", average(mistralHArray)), String.format("%.4f", average(geminiHArray)));
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Avg LLM Judge Overall Score", String.format("%.4f", average(mistralJArray)), String.format("%.4f", average(geminiJArray)));
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Clean Articles (No Hard Fail)", mistralCleanArticles + " / " + mistralNetworkCompleted + " (" + formatPct(mistralCleanArticles, mistralNetworkCompleted) + ")", geminiCleanArticles + " / " + geminiNetworkCompleted + " (" + formatPct(geminiCleanArticles, geminiNetworkCompleted) + ")");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Step Hard Gate Failures", mistralHardFailEvents + " / " + mistralTotalSteps + " steps (" + formatPct(mistralHardFailEvents, mistralTotalSteps) + ")", geminiHardFailEvents + " / " + geminiTotalSteps + " steps (" + formatPct(geminiHardFailEvents, geminiTotalSteps) + ")");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Avg Heuristic Quality Score", String.format("%.4f (n=%d)", average(mistralHAll), mistralHAll.length), String.format("%.4f (n=%d)", average(geminiHAll), geminiHAll.length));
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Avg LLM Judge Overall Score", String.format("%.4f (n=%d)", average(mistralJCorr), mistralJCorr.length), String.format("%.4f (n=%d)", average(geminiJCorr), geminiJCorr.length));
         System.out.printf( " %-28s | %-32s | %-32s\n", "Judge Distinct Scores Count", mistralDistinctJudgeScores.size() + " distinct values", geminiDistinctJudgeScores.size() + " distinct values");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Judge Parsing Failures", mistralJudgeParsingFailures + " (omitted from r_s)", geminiJudgeParsingFailures + " (omitted from r_s)");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Spearman Rank (r_s)", String.format("%.4f", rsMistral), String.format("%.4f", rsGemini));
-        System.out.println("----------------------------------------------------------------------------------------------------");
-        System.out.println(" [ARM B: Qwen 3 14B Status] : SKIPPED (Ollama server offline at http://localhost:11434)");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Judge Network Failures (429)", mistralJudgeNetworkFailures + " calls", geminiJudgeNetworkFailures + " calls");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Judge JSON Parse Failures", mistralJudgeParsingFailures + " calls", geminiJudgeParsingFailures + " calls");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Spearman Rank Correlation (r_s)", String.format("%.4f (n_judge=%d)", rsMistral, mistralJCorr.length), String.format("%.4f (n_judge=%d)", rsGemini, geminiJCorr.length));
         System.out.println("====================================================================================================\n");
 
         assertThat(totalN).isEqualTo(20);
         assertThat(mistralNetworkCompleted).isGreaterThan(0);
         assertThat(geminiNetworkCompleted).isGreaterThan(0);
-        assertThat(persistedEvalScores.size()).isGreaterThan(0);
+    }
+
+    private String formatPct(int num, int denom) {
+        if (denom == 0) return "0.0%";
+        return String.format("%.1f%%", ((double) num / denom) * 100.0);
     }
 
     private double average(double[] values) {

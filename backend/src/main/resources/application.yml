@@ -43,9 +43,9 @@ ai:
     temperature: 0.3
   gemini:
     api-key: ${GEMINI_API_KEY:}
-    # Recommended free-tier model: gemini-3.6-flash (1M context, JSON schema output)
-    model: ${GEMINI_MODEL:gemini-3.6-flash}
-    fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-3.6-flash}
+    # Recommended free-tier model: gemini-2.5-flash (15 RPM / 1,500 RPD, 1M context, JSON schema output)
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+    fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-2.5-flash}
     connect-timeout-seconds: 10
     read-timeout-seconds: 120
     temperature: 0.3

@@ -5,7 +5,7 @@ import java.util.Comparator;
 
 /**
  * Calculates Spearman Rank Correlation Coefficient (r_s) between two sets of numerical scores.
- * Formula: r_s = 1 - (6 * sum(d_i^2)) / (n * (n^2 - 1))
+ * Uses Pearson correlation coefficient on fractional rank vectors to correctly handle ties.
  */
 public class SpearmanCorrelationCalculator {
 
@@ -21,18 +21,29 @@ public class SpearmanCorrelationCalculator {
         double[] rankX = computeRanks(x);
         double[] rankY = computeRanks(y);
 
-        double sumD2 = 0.0;
+        double meanX = 0.0, meanY = 0.0;
         for (int i = 0; i < n; i++) {
-            double diff = rankX[i] - rankY[i];
-            sumD2 += diff * diff;
+            meanX += rankX[i];
+            meanY += rankY[i];
+        }
+        meanX /= n;
+        meanY /= n;
+
+        double num = 0.0, denX = 0.0, denY = 0.0;
+        for (int i = 0; i < n; i++) {
+            double dx = rankX[i] - meanX;
+            double dy = rankY[i] - meanY;
+            num += dx * dy;
+            denX += dx * dx;
+            denY += dy * dy;
         }
 
-        double denominator = n * ((double) n * n - 1.0);
-        if (denominator == 0) {
-            return 1.0;
+        double denominator = Math.sqrt(denX * denY);
+        if (denominator == 0.0) {
+            return 0.0;
         }
 
-        return 1.0 - (6.0 * sumD2 / denominator);
+        return num / denominator;
     }
 
     private static double[] computeRanks(double[] values) {
