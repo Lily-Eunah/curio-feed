@@ -31,7 +31,7 @@ admin:
     token: ${ADMIN_API_TOKEN:}
 
 ai:
-  # Set to "gemini" to use Google Gemini API, or "ollama" (default) for local Ollama
+  # Set to "gemini" to use Google Gemini API, "mistral" for Mistral API, or "ollama" (default) for local Ollama
   provider: ${AI_PROVIDER:ollama}
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
@@ -46,6 +46,14 @@ ai:
     # Recommended free-tier model: gemini-2.5-flash (1M context, JSON schema output)
     model: ${GEMINI_MODEL:gemini-2.5-flash}
     fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-2.5-flash}
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 120
+    temperature: 0.3
+  mistral:
+    api-key: ${MISTRAL_API_KEY:}
+    model: ${MISTRAL_MODEL:mistral-small-latest}
+    fallback-model: ${MISTRAL_FALLBACK_MODEL:ministral-8b-latest}
+    base-url: ${MISTRAL_BASE_URL:https://api.mistral.ai}
     connect-timeout-seconds: 10
     read-timeout-seconds: 120
     temperature: 0.3
