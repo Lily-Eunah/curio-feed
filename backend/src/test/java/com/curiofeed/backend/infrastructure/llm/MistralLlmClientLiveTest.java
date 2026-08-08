@@ -1,6 +1,7 @@
 package com.curiofeed.backend.infrastructure.llm;
 
 import com.curiofeed.backend.config.MistralProperties;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -32,9 +33,8 @@ class MistralLlmClientLiveTest {
     @BeforeEach
     void setUp() {
         String apiKey = System.getenv("MISTRAL_API_KEY");
-        if (apiKey == null || apiKey.isBlank()) {
-            apiKey = "REDACTED_MISTRAL_API_KEY";
-        }
+        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
+                "MISTRAL_API_KEY is not set — skipping live Mistral test.");
         MistralProperties properties = new MistralProperties(apiKey, MODEL, "ministral-8b-2410", BASE_URL, 10, 120, 0.3);
         client = new MistralLlmClient(properties, MODEL, RestClient.builder());
     }

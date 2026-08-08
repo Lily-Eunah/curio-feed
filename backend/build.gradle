@@ -54,7 +54,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'ollama', 'external', 'pending', 'eval'
+        excludeTags 'ollama', 'external', 'pending', 'eval', 'mistral'
     }
 
     testLogging {
@@ -119,6 +119,24 @@ tasks.register('geminiIntegrationTest', Test) {
     }
     jvmArgs "-Dfile.encoding=UTF-8"
     environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
+}
+
+// Multi-arm live benchmark (Mistral + Gemini generation, Gemini judge) — consumes quota.
+// Run only when explicitly needed; never run in CI or default build.
+tasks.register('multiArmBenchmark', Test) {
+    description = 'Runs the live multi-arm benchmark against the Golden Dataset (requires MISTRAL/GEMINI API keys).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'mistral'
+    }
+    testLogging {
+        showStandardStreams = true
+        events "started", "passed", "failed"
+        exceptionFormat "full"
+    }
+    jvmArgs "-Dfile.encoding=UTF-8"
+    environment "TESTCONTAINERS_CHECKS_DISABLE", "true"
+    outputs.upToDateWhen { false }
 }
 
 // All external tests (ollama + gemini + other live services) in one task.

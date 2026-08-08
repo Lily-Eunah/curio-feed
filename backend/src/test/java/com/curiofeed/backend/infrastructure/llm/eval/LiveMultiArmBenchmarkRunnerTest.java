@@ -12,6 +12,7 @@ import com.curiofeed.backend.infrastructure.llm.validation.VocabLemmatizer;
 import com.curiofeed.backend.infrastructure.llm.validation.VocabStepValidator;
 import com.curiofeed.backend.domain.service.SemanticEvaluatorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -60,10 +61,8 @@ class LiveMultiArmBenchmarkRunnerTest {
     @Test
     @DisplayName("Execute Empirical Multi-Arm Benchmark on Golden Dataset (N=20) with Independent LLM Judge")
     void runLiveMultiArmBenchmark() throws Exception {
-        String mistralApiKey = "REDACTED_MISTRAL_API_KEY";
-        String geminiApiKey = System.getenv("GEMINI_API_KEY") != null && !System.getenv("GEMINI_API_KEY").isBlank()
-                ? System.getenv("GEMINI_API_KEY")
-                : "REDACTED_GEMINI_API_KEY";
+        String mistralApiKey = requireApiKey("MISTRAL_API_KEY");
+        String geminiApiKey = requireApiKey("GEMINI_API_KEY");
 
         // Setup Model Arms
         MistralProperties mistralProps = new MistralProperties(mistralApiKey, "mistral-small-2603", "ministral-8b-2410", "https://api.mistral.ai", 10, 120, 0.3);
@@ -101,7 +100,7 @@ class LiveMultiArmBenchmarkRunnerTest {
         int mistralJudgeNetworkFailures = 0; // Judge HTTP/Quota errors
         int mistralJudgeParsingFailures = 0; // Judge JSON parsing errors
 
-        // ── Arm A: Gemini 3.6 Flash Metrics ──────────────────────────────────
+        // ── Arm A: Gemini 3.5 Flash Lite Metrics ─────────────────────────────
         List<Double> geminiHeuristics = new ArrayList<>();
         List<Double> geminiJudgesForCorrelation = new ArrayList<>();
         List<Double> geminiHeuristicsForCorrelation = new ArrayList<>();
@@ -170,7 +169,7 @@ class LiveMultiArmBenchmarkRunnerTest {
                 double hScore = qualityScorer.score(fullResult);
                 mistralHeuristics.add(hScore);
 
-                // Dedicated Inner Try-Catch for LLM-as-Judge (Gemini 3.6 Flash evaluating Mistral)
+                // Dedicated Inner Try-Catch for LLM-as-Judge (Gemini 3.5 Flash Lite evaluating Mistral)
                 try {
                     String judgePrompt = evalPromptBuilder.buildEvaluationPrompt(article.originalContent(), content, level);
                     String judgeRaw = judgeClient.generate(judgePrompt, EvalPromptBuilder.evalSchema());
@@ -212,7 +211,7 @@ class LiveMultiArmBenchmarkRunnerTest {
             }
 
             // ═════════════════════════════════════════════════════════════════
-            // 2. Arm A: Gemini 3.6 Flash (Full 3-Step Pipeline)
+            // 2. Arm A: Gemini 3.5 Flash Lite (Full 3-Step Pipeline)
             // ═════════════════════════════════════════════════════════════════
             try {
                 boolean articleClean = true;
@@ -318,7 +317,7 @@ class LiveMultiArmBenchmarkRunnerTest {
         System.out.println("\n====================================================================================================");
         System.out.println("            [EMPIRICAL MULTI-ARM BENCHMARK & SPEARMAN CORRELATION RESULTS (N=" + totalN + ")]");
         System.out.println("====================================================================================================");
-        System.out.println(" Independent Judge Model : " + judgeModelName + " (Dynamic Resolution — No Self-Evaluation Bias)");
+        System.out.println(" LLM-as-Judge Model      : " + judgeModelName + " (independent for Arm C / Mistral; SELF-EVALUATION for Arm A / Gemini)");
         System.out.println(" Total Golden Articles   : " + totalN + " Golden Dataset Articles");
         System.out.println(" EvalScores Persisted    : " + persistedEvalScores.size() + " records registered for /api/admin/ab-compare");
         System.out.println("----------------------------------------------------------------------------------------------------");
@@ -338,6 +337,14 @@ class LiveMultiArmBenchmarkRunnerTest {
         assertThat(totalN).isEqualTo(20);
         assertThat(mistralNetworkCompleted).isGreaterThan(0);
         assertThat(geminiNetworkCompleted).isGreaterThan(0);
+    }
+
+    /** Reads a live API key from the environment — the same source application.yml resolves. Never hardcode keys here. */
+    private static String requireApiKey(String envVar) {
+        String value = System.getenv(envVar);
+        Assumptions.assumeTrue(value != null && !value.isBlank(),
+                envVar + " is not set — skipping live benchmark. Export it before running ./gradlew multiArmBenchmark.");
+        return value;
     }
 
     private String formatPct(int num, int denom) {
