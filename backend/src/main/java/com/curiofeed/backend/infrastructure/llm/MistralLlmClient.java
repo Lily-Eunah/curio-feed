@@ -19,6 +19,7 @@ public class MistralLlmClient implements LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(MistralLlmClient.class);
     private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
+    private static final String MODELS_PATH = "/v1/models";
 
     private static final int MAX_RATE_LIMIT_RETRIES = 2;
     private static final long BACKOFF_MS = 10_000L;
@@ -70,6 +71,18 @@ public class MistralLlmClient implements LlmClient {
         throw new LlmClientException("Mistral generate unreachable");
     }
 
+    public String listModels() {
+        try {
+            return restClient.get()
+                    .uri(MODELS_PATH)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + (apiKey != null ? apiKey : ""))
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientException e) {
+            throw new LlmClientException("Failed to fetch Mistral models: " + e.getMessage(), e);
+        }
+    }
+
     private void recordRateLimitHit() {
         if (meterRegistry != null) {
             Counter.builder("curiofeed.llm.mistral.ratelimit.hits")
@@ -79,16 +92,16 @@ public class MistralLlmClient implements LlmClient {
         }
     }
 
-    private void recordRequestMetric(String status, long durationMs) {
+    private void recordRequestMetric(String status, String usedModel, long durationMs) {
         if (meterRegistry != null) {
             Counter.builder("curiofeed.llm.mistral.requests")
                     .tag("status", status)
-                    .tag("model", model)
+                    .tag("model", usedModel)
                     .register(meterRegistry)
                     .increment();
             Timer.builder("curiofeed.llm.mistral.duration")
                     .tag("status", status)
-                    .tag("model", model)
+                    .tag("model", usedModel)
                     .register(meterRegistry)
                     .record(durationMs, TimeUnit.MILLISECONDS);
         }
@@ -96,7 +109,7 @@ public class MistralLlmClient implements LlmClient {
 
     private String doGenerate(String prompt, Map<String, Object> schema) {
         MistralRequest.ResponseFormat responseFormat = (schema != null)
-                ? MistralRequest.ResponseFormat.jsonObject()
+                ? MistralRequest.ResponseFormat.jsonSchema(schema)
                 : null;
 
         MistralRequest request = new MistralRequest(
@@ -135,17 +148,20 @@ public class MistralLlmClient implements LlmClient {
                 throw new LlmClientException("Mistral call failed: empty content");
             }
 
-            recordRequestMetric("success", System.currentTimeMillis() - startTimeMs);
+            String resolvedModel = (response.model() != null && !response.model().isBlank()) ? response.model() : this.model;
+            log.info("[MistralLlmClient] Call succeeded model={} (configured={})", resolvedModel, this.model);
+
+            recordRequestMetric("success", resolvedModel, System.currentTimeMillis() - startTimeMs);
             return choice.message().content();
 
         } catch (RateLimitException e) {
-            recordRequestMetric("rate_limited", System.currentTimeMillis() - startTimeMs);
+            recordRequestMetric("rate_limited", model, System.currentTimeMillis() - startTimeMs);
             throw e;
         } catch (LlmClientException e) {
-            recordRequestMetric("error", System.currentTimeMillis() - startTimeMs);
+            recordRequestMetric("error", model, System.currentTimeMillis() - startTimeMs);
             throw e;
         } catch (RestClientException e) {
-            recordRequestMetric("error", System.currentTimeMillis() - startTimeMs);
+            recordRequestMetric("error", model, System.currentTimeMillis() - startTimeMs);
             throw new LlmClientException("Mistral call failed: " + e.getMessage(), e);
         }
     }

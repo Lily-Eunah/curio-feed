@@ -22,7 +22,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class MistralLlmClientTest {
 
-    private static final String MODEL = "mistral-small-latest";
+    private static final String MODEL = "mistral-small-2501";
     private static final String API_KEY = "test-mistral-api-key";
 
     private MockRestServiceServer mockServer;
@@ -35,7 +35,7 @@ class MistralLlmClientTest {
         mockServer = MockRestServiceServer.bindTo(builder).build();
         meterRegistry = new SimpleMeterRegistry();
         MistralProperties properties = new MistralProperties(
-                API_KEY, MODEL, "ministral-8b-latest", "https://api.mistral.ai", 5, 5, 0.3
+                API_KEY, MODEL, "ministral-8b-2410", "https://api.mistral.ai", 5, 5, 0.3
         );
         client = new MistralLlmClient(properties, MODEL, builder, meterRegistry);
     }
@@ -47,11 +47,12 @@ class MistralLlmClientTest {
     }
 
     @Test
-    @DisplayName("generate sends authorization header and returns message content")
-    void generate_successResponse_returnsContent() {
+    @DisplayName("generate sends authorization header and returns message content with resolved model metric tag")
+    void generate_successResponse_returnsContentAndRecordsResolvedModel() {
         String jsonResponseBody = """
                 {
                   "id": "chatcmpl-test",
+                  "model": "mistral-small-2501",
                   "choices": [
                     {
                       "index": 0,
@@ -81,14 +82,17 @@ class MistralLlmClientTest {
         assertThat(result).isEqualTo("Hello world from Mistral");
         mockServer.verify();
 
-        assertThat(meterRegistry.find("curiofeed.llm.mistral.requests").counter().count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find("curiofeed.llm.mistral.requests")
+                .tag("model", "mistral-small-2501")
+                .counter().count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("generate with schema includes response_format json_object")
-    void generate_withSchema_includesResponseFormat() {
+    @DisplayName("generate with schema sends strict json_schema response_format")
+    void generate_withSchema_includesStrictJsonSchema() {
         String jsonResponseBody = """
                 {
+                  "model": "mistral-small-2501",
                   "choices": [
                     {
                       "message": {
@@ -101,12 +105,37 @@ class MistralLlmClientTest {
 
         mockServer.expect(requestTo("https://api.mistral.ai/v1/chat/completions"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(jsonPath("$.response_format.type").value("json_object"))
+                .andExpect(jsonPath("$.response_format.type").value("json_schema"))
+                .andExpect(jsonPath("$.response_format.json_schema.strict").value(true))
                 .andRespond(withSuccess(jsonResponseBody, MediaType.APPLICATION_JSON));
 
         String result = client.generate("Generate json", Map.of("type", "object"));
 
         assertThat(result).contains("result");
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("listModels sends GET request to /v1/models")
+    void listModels_success() {
+        String modelsResponseBody = """
+                {
+                  "object": "list",
+                  "data": [
+                    { "id": "mistral-small-2501", "object": "model" },
+                    { "id": "ministral-8b-2410", "object": "model" }
+                  ]
+                }
+                """;
+
+        mockServer.expect(requestTo("https://api.mistral.ai/v1/models"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY))
+                .andRespond(withSuccess(modelsResponseBody, MediaType.APPLICATION_JSON));
+
+        String modelsJson = client.listModels();
+
+        assertThat(modelsJson).contains("mistral-small-2501", "ministral-8b-2410");
         mockServer.verify();
     }
 

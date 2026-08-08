@@ -5,6 +5,7 @@ import java.util.List;
 
 public record MistralResponse(
         String id,
+        String model,
         List<Choice> choices,
         Usage usage
 ) {
