@@ -25,7 +25,9 @@ import org.springframework.web.client.RestClient;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,6 +101,8 @@ class LiveMultiArmBenchmarkRunnerTest {
         int mistralNetworkCompleted = 0;     // Articles completing full 3-step generation
         int mistralJudgeNetworkFailures = 0; // Judge HTTP/Quota errors
         int mistralJudgeParsingFailures = 0; // Judge JSON parsing errors
+        int[] mistralStepHardFails = new int[3];                  // [0]=content, [1]=vocab, [2]=quiz
+        Map<String, Integer> mistralFailReasons = new LinkedHashMap<>();
 
         // ── Arm A: Gemini 3.5 Flash Lite Metrics ─────────────────────────────
         List<Double> geminiHeuristics = new ArrayList<>();
@@ -110,6 +114,8 @@ class LiveMultiArmBenchmarkRunnerTest {
         int geminiNetworkCompleted = 0;
         int geminiJudgeNetworkFailures = 0;
         int geminiJudgeParsingFailures = 0;
+        int[] geminiStepHardFails = new int[3];
+        Map<String, Integer> geminiFailReasons = new LinkedHashMap<>();
 
         log.info("Starting Empirical Multi-Arm Benchmark on N={} articles. Independent Judge: {}", totalN, judgeModelName);
 
@@ -132,6 +138,11 @@ class LiveMultiArmBenchmarkRunnerTest {
                 ContentValidationResult contentVal = contentValidator.validate(content, level);
                 if (contentVal.isHardFail()) {
                     mistralHardFailEvents++;
+                    mistralStepHardFails[0]++;
+                    tally(mistralFailReasons, "STEP1 content " + contentVal.getStatus());
+                    log.warn("[Arm C - Mistral] {} STEP1 HARD FAIL: {} (words={}, hardRange={}..{})",
+                            article.id(), contentVal.getStatus(), contentVal.getActualWordCount(),
+                            contentVal.getHardMin(), contentVal.getHardMax());
                     articleClean = false;
                 }
 
@@ -142,9 +153,12 @@ class LiveMultiArmBenchmarkRunnerTest {
                 List<GenerationResult.VocabularyData> vocabs = (step2Result != null && step2Result.vocabularies() != null) ? step2Result.vocabularies() : List.of();
 
                 List<String> vocabErrors = vocabValidator.validate(vocabs, content);
-                boolean vocabHardFail = vocabErrors.stream().anyMatch(e -> !e.startsWith("[SOFT]"));
-                if (vocabHardFail) {
+                List<String> vocabHardErrors = vocabErrors.stream().filter(e -> !e.startsWith("[SOFT]")).toList();
+                if (!vocabHardErrors.isEmpty()) {
                     mistralHardFailEvents++;
+                    mistralStepHardFails[1]++;
+                    vocabHardErrors.forEach(e -> tally(mistralFailReasons, "STEP2 vocab " + normalizeReason(e)));
+                    log.warn("[Arm C - Mistral] {} STEP2 HARD FAIL: {}", article.id(), vocabHardErrors);
                     articleClean = false;
                 }
 
@@ -155,9 +169,12 @@ class LiveMultiArmBenchmarkRunnerTest {
                 List<GenerationResult.QuizData> quizzes = (step3Result != null && step3Result.quizzes() != null) ? step3Result.quizzes() : List.of();
 
                 List<String> quizErrors = quizValidator.validate(quizzes, vocabs);
-                boolean quizHardFail = quizErrors.stream().anyMatch(e -> !e.startsWith("[SOFT]"));
-                if (quizHardFail) {
+                List<String> quizHardErrors = quizErrors.stream().filter(e -> !e.startsWith("[SOFT]")).toList();
+                if (!quizHardErrors.isEmpty()) {
                     mistralHardFailEvents++;
+                    mistralStepHardFails[2]++;
+                    quizHardErrors.forEach(e -> tally(mistralFailReasons, "STEP3 quiz " + normalizeReason(e)));
+                    log.warn("[Arm C - Mistral] {} STEP3 HARD FAIL: {}", article.id(), quizHardErrors);
                     articleClean = false;
                 }
 
@@ -225,6 +242,11 @@ class LiveMultiArmBenchmarkRunnerTest {
                 ContentValidationResult contentVal = contentValidator.validate(content, level);
                 if (contentVal.isHardFail()) {
                     geminiHardFailEvents++;
+                    geminiStepHardFails[0]++;
+                    tally(geminiFailReasons, "STEP1 content " + contentVal.getStatus());
+                    log.warn("[Arm A - Gemini] {} STEP1 HARD FAIL: {} (words={}, hardRange={}..{})",
+                            article.id(), contentVal.getStatus(), contentVal.getActualWordCount(),
+                            contentVal.getHardMin(), contentVal.getHardMax());
                     articleClean = false;
                 }
 
@@ -235,9 +257,12 @@ class LiveMultiArmBenchmarkRunnerTest {
                 List<GenerationResult.VocabularyData> vocabs = (step2Result != null && step2Result.vocabularies() != null) ? step2Result.vocabularies() : List.of();
 
                 List<String> vocabErrors = vocabValidator.validate(vocabs, content);
-                boolean vocabHardFail = vocabErrors.stream().anyMatch(e -> !e.startsWith("[SOFT]"));
-                if (vocabHardFail) {
+                List<String> vocabHardErrors = vocabErrors.stream().filter(e -> !e.startsWith("[SOFT]")).toList();
+                if (!vocabHardErrors.isEmpty()) {
                     geminiHardFailEvents++;
+                    geminiStepHardFails[1]++;
+                    vocabHardErrors.forEach(e -> tally(geminiFailReasons, "STEP2 vocab " + normalizeReason(e)));
+                    log.warn("[Arm A - Gemini] {} STEP2 HARD FAIL: {}", article.id(), vocabHardErrors);
                     articleClean = false;
                 }
 
@@ -248,9 +273,12 @@ class LiveMultiArmBenchmarkRunnerTest {
                 List<GenerationResult.QuizData> quizzes = (step3Result != null && step3Result.quizzes() != null) ? step3Result.quizzes() : List.of();
 
                 List<String> quizErrors = quizValidator.validate(quizzes, vocabs);
-                boolean quizHardFail = quizErrors.stream().anyMatch(e -> !e.startsWith("[SOFT]"));
-                if (quizHardFail) {
+                List<String> quizHardErrors = quizErrors.stream().filter(e -> !e.startsWith("[SOFT]")).toList();
+                if (!quizHardErrors.isEmpty()) {
                     geminiHardFailEvents++;
+                    geminiStepHardFails[2]++;
+                    quizHardErrors.forEach(e -> tally(geminiFailReasons, "STEP3 quiz " + normalizeReason(e)));
+                    log.warn("[Arm A - Gemini] {} STEP3 HARD FAIL: {}", article.id(), quizHardErrors);
                     articleClean = false;
                 }
 
@@ -332,11 +360,35 @@ class LiveMultiArmBenchmarkRunnerTest {
         System.out.printf( " %-28s | %-32s | %-32s\n", "Judge Network Failures (429)", mistralJudgeNetworkFailures + " calls", geminiJudgeNetworkFailures + " calls");
         System.out.printf( " %-28s | %-32s | %-32s\n", "Judge JSON Parse Failures", mistralJudgeParsingFailures + " calls", geminiJudgeParsingFailures + " calls");
         System.out.printf( " %-28s | %-32s | %-32s\n", "Spearman Rank Correlation (r_s)", String.format("%.4f (n_judge=%d)", rsMistral, mistralJCorr.length), String.format("%.4f (n_judge=%d)", rsGemini, geminiJCorr.length));
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Hard Fails by Step (S1/S2/S3)",
+                mistralStepHardFails[0] + " / " + mistralStepHardFails[1] + " / " + mistralStepHardFails[2],
+                geminiStepHardFails[0] + " / " + geminiStepHardFails[1] + " / " + geminiStepHardFails[2]);
+        System.out.println("----------------------------------------------------------------------------------------------------");
+        printFailReasons("Arm C: Mistral Small 4 — hard gate failure reasons", mistralFailReasons);
+        printFailReasons("Arm A: Gemini — hard gate failure reasons", geminiFailReasons);
         System.out.println("====================================================================================================\n");
 
         assertThat(totalN).isEqualTo(20);
         assertThat(mistralNetworkCompleted).isGreaterThan(0);
         assertThat(geminiNetworkCompleted).isGreaterThan(0);
+    }
+
+    private static void tally(Map<String, Integer> counts, String reason) {
+        counts.merge(reason, 1, Integer::sum);
+    }
+
+    /** Strips article-specific detail so failures of the same kind aggregate into one bucket. */
+    private static String normalizeReason(String rawError) {
+        String reason = rawError.replaceAll("\\[\\d+\\]", "[i]").replaceAll("got \\d+", "got N");
+        int colon = reason.indexOf(':');
+        return (colon > 0 ? reason.substring(0, colon) : reason).trim();
+    }
+
+    private void printFailReasons(String title, Map<String, Integer> counts) {
+        System.out.println(" " + title + (counts.isEmpty() ? " — none" : ""));
+        counts.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                .forEach(e -> System.out.printf("   %-4d x  %s\n", e.getValue(), e.getKey()));
     }
 
     /** Reads a live API key from the environment — the same source application.yml resolves. Never hardcode keys here. */
