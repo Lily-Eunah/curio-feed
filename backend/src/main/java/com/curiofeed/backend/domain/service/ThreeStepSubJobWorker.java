@@ -71,6 +71,8 @@ public class ThreeStepSubJobWorker {
 
     private final CompositeSafetyFilter safetyFilter;
     private final QualityScorer qualityScorer;
+    private final ThreeStepPipelineMetrics metrics;
+    private final SemanticEvaluatorService semanticEvaluator;
     private final GenerationResultSaver resultSaver;
     private final ArticleStatusAggregator aggregator;
 
@@ -94,6 +96,8 @@ public class ThreeStepSubJobWorker {
             TitleSimilarityValidator titleSimilarityValidator,
             CompositeSafetyFilter safetyFilter,
             QualityScorer qualityScorer,
+            ThreeStepPipelineMetrics metrics,
+            SemanticEvaluatorService semanticEvaluator,
             GenerationResultSaver resultSaver,
             ArticleStatusAggregator aggregator) {
         this.lockService = lockService;
@@ -115,6 +119,8 @@ public class ThreeStepSubJobWorker {
         this.titleSimilarityValidator = titleSimilarityValidator;
         this.safetyFilter = safetyFilter;
         this.qualityScorer = qualityScorer;
+        this.metrics = metrics;
+        this.semanticEvaluator = semanticEvaluator;
         this.resultSaver = resultSaver;
         this.aggregator = aggregator;
     }
@@ -305,10 +311,13 @@ public class ThreeStepSubJobWorker {
                 }
 
                 log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_START", subJobId, attempt);
-                resultSaver.saveContent(articleId, level, content);
+                ArticleContent savedContent = resultSaver.saveContent(articleId, level, content);
                 log.info("[diagnostics] subJob={} step=CONTENT attempt={} event=SAVE_COMPLETE", subJobId, attempt);
 
                 double contentQualityScore = qualityScorer.score(new GenerationResult(content, null, null, null, null));
+                metrics.recordQualityScore(promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), level, contentQualityScore);
+                semanticEvaluator.maybeEvaluateAsync(savedContent, sourceText);
+
                 String vStatus = validationResult.getStatus() != ContentValidationResult.ValidationStatus.VALID ? "PASS_WITH_WARNINGS" : "PASS";
                 step.markCompleted(vStatus, promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), contentQualityScore);
                 stepJobRepository.save(step);
