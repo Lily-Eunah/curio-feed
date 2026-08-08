@@ -69,10 +69,10 @@ class LiveMultiArmBenchmarkRunnerTest {
         MistralProperties mistralProps = new MistralProperties(mistralApiKey, "mistral-small-2603", "ministral-8b-2410", "https://api.mistral.ai", 10, 120, 0.3);
         MistralLlmClient mistralClient = new MistralLlmClient(mistralProps, "mistral-small-2603", RestClient.builder());
 
-        GeminiProperties geminiProps = new GeminiProperties(geminiApiKey, "gemini-2.5-flash", "gemini-2.5-flash", 10, 120, 0.3);
-        GeminiLlmClient geminiClient = new GeminiLlmClient(geminiProps, "gemini-2.5-flash", RestClient.builder());
+        GeminiProperties geminiProps = new GeminiProperties(geminiApiKey, "gemini-3.6-flash", "gemini-3.6-flash", 10, 120, 0.3);
+        GeminiLlmClient geminiClient = new GeminiLlmClient(geminiProps, "gemini-3.6-flash", RestClient.builder());
 
-        // Independent LLM-as-Judge Client: Gemini 2.5 Flash evaluates Mistral & Gemini outputs
+        // Independent LLM-as-Judge Client: Gemini 3.6 Flash evaluates Mistral & Gemini outputs
         LlmClient judgeClient = geminiClient;
         String judgeModelName = judgeClient.getModelName();
 
@@ -302,7 +302,7 @@ class LiveMultiArmBenchmarkRunnerTest {
         System.out.println(" Total Golden Articles   : " + totalN + " (Total Steps: " + (totalN * 3) + " steps per Arm)");
         System.out.println(" EvalScores Persisted    : " + persistedEvalScores.size() + " records registered for /api/admin/ab-compare");
         System.out.println("----------------------------------------------------------------------------------------------------");
-        System.out.printf( " %-28s | %-32s | %-32s\n", "Metric Category", "Arm C: Mistral Small 4", "Arm A: Gemini 2.5 Flash");
+        System.out.printf( " %-28s | %-32s | %-32s\n", "Metric Category", "Arm C: Mistral Small 4", "Arm A: Gemini 3.6 Flash");
         System.out.printf( " %-28s | %-32s | %-32s\n", "Model ID", mistralClient.getModelName(), geminiClient.getModelName());
         System.out.printf( " %-28s | %-32s | %-32s\n", "Completed Network Runs", mistralNetworkCompleted + " / " + totalN, geminiNetworkCompleted + " / " + totalN);
         System.out.printf( " %-28s | %-32s | %-32s\n", "Clean Articles (No Hard Fail)", mistralCleanArticles + " / " + totalN + " (" + String.format("%.1f", (double)mistralCleanArticles/totalN*100) + "%)", geminiCleanArticles + " / " + totalN + " (" + String.format("%.1f", (double)geminiCleanArticles/totalN*100) + "%)");
