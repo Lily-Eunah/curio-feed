@@ -51,7 +51,7 @@ ai:
     temperature: 0.3
   mistral:
     api-key: ${MISTRAL_API_KEY:}
-    model: ${MISTRAL_MODEL:mistral-small-2501}
+    model: ${MISTRAL_MODEL:mistral-small-2603}
     fallback-model: ${MISTRAL_FALLBACK_MODEL:ministral-8b-2410}
     base-url: ${MISTRAL_BASE_URL:https://api.mistral.ai}
     connect-timeout-seconds: 10
