@@ -58,6 +58,7 @@ ai:
     read-timeout-seconds: 120
     temperature: 0.3
   pipeline:
+    scheduler-enabled: ${AI_PIPELINE_SCHEDULER_ENABLED:false}
     max-retry-count: 3
     stale-job-threshold-minutes: 10
     scheduler-fixed-delay-ms: 3000

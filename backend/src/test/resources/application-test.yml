@@ -19,3 +19,7 @@ spring:
 admin:
   api:
     token: test-admin-token
+
+ai:
+  pipeline:
+    scheduler-enabled: true
