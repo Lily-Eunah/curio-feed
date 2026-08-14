@@ -106,6 +106,14 @@ public class ThreeStepPipelineMetrics {
                 .increment();
     }
 
+    public void recordQualityScore(String promptVersion, String modelName, DifficultyLevel level, double score) {
+        io.micrometer.core.instrument.Gauge.builder("curiofeed.pipeline.quality_score", () -> score)
+                .tag("prompt_version", promptVersion != null ? promptVersion : "unknown")
+                .tag("model_name", modelName != null ? modelName : "unknown")
+                .tag("difficulty", level.name())
+                .register(meterRegistry);
+    }
+
     // ── Periodic summary log ──────────────────────────────────────────────────
 
     @Scheduled(fixedDelay = 60_000)

@@ -7,6 +7,7 @@ import com.curiofeed.backend.domain.repository.ArticleGenerationJobRepository;
 import com.curiofeed.backend.domain.repository.ArticleGenerationSubJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,27 +25,31 @@ public class ReconciliationScheduler {
     private final ArticleGenerationJobRepository jobRepository;
     private final ArticleStatusAggregator aggregator;
     private final PipelineProperties pipelineProperties;
+    private final boolean schedulerEnabled;
 
     public ReconciliationScheduler(
             ArticleGenerationSubJobRepository subJobRepository,
             ArticleGenerationJobRepository jobRepository,
             ArticleStatusAggregator aggregator,
-            PipelineProperties pipelineProperties) {
+            PipelineProperties pipelineProperties,
+            @Value("${ai.pipeline.scheduler-enabled:false}") boolean schedulerEnabled) {
         this.subJobRepository = subJobRepository;
         this.jobRepository = jobRepository;
         this.aggregator = aggregator;
         this.pipelineProperties = pipelineProperties;
+        this.schedulerEnabled = schedulerEnabled;
     }
 
     /**
      * Stale PROCESSING SubJob 복구: 1분마다 실행.
-     * threshold 이상 heartbeat가 없으면:
-     *  - retryCount < maxRetryCount → PENDING (Worker가 다음 스케줄에 재시도)
-     *  - retryCount >= maxRetryCount → FAILED
+     * schedulerEnabled=false일 때는 Neon Auto-suspend를 위해 실행하지 않음.
      */
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void recoverStaleJobs() {
+        if (!schedulerEnabled) {
+            return;
+        }
         Instant threshold = Instant.now().minus(pipelineProperties.staleJobThresholdMinutes(), ChronoUnit.MINUTES);
         List<ArticleGenerationSubJob> staleJobs = subJobRepository.findStaleProcessingJobs(threshold);
 
@@ -52,7 +57,6 @@ public class ReconciliationScheduler {
             if (subJob.getRetryCount() < pipelineProperties.maxRetryCount()) {
                 log.info("Recovering stale SubJob {} → PENDING (retryCount={})",
                         subJob.getId(), subJob.getRetryCount());
-                // JPQL direct UPDATE (예외적 허용: lock 획득 외 stale 복구 목적)
                 subJobRepository.resetToPending(subJob.getId());
             } else {
                 log.warn("Marking stale SubJob {} → FAILED (retryCount={} >= maxRetry={})",
@@ -65,11 +69,14 @@ public class ReconciliationScheduler {
 
     /**
      * Article 상태 재집계: 1분마다 실행.
-     * 모든 SubJob이 terminal state인데 Article이 아직 DRAFT/FAILED인 경우 재집계.
+     * schedulerEnabled=false일 때는 Neon Auto-suspend를 위해 실행하지 않음.
      */
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void reconcileArticleStatus() {
+        if (!schedulerEnabled) {
+            return;
+        }
         jobRepository.findJobsPendingReconciliation()
                 .forEach(job -> {
                     log.info("Reconciling article status for job {}", job.getId());

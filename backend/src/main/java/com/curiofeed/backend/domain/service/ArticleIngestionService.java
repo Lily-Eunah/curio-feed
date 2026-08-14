@@ -26,6 +26,7 @@ public class ArticleIngestionService {
     private final CategoryRepository categoryRepository;
     private final SlugGenerator slugGenerator;
     private final MeterRegistry meterRegistry;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public ArticleIngestionService(
             ArticleRepository articleRepository,
@@ -34,7 +35,8 @@ public class ArticleIngestionService {
             ArticleGenerationStepJobRepository stepJobRepository,
             CategoryRepository categoryRepository,
             SlugGenerator slugGenerator,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.articleRepository = articleRepository;
         this.jobRepository = jobRepository;
         this.subJobRepository = subJobRepository;
@@ -42,6 +44,7 @@ public class ArticleIngestionService {
         this.categoryRepository = categoryRepository;
         this.slugGenerator = slugGenerator;
         this.meterRegistry = meterRegistry;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -98,6 +101,7 @@ public class ArticleIngestionService {
         }
 
         recordIngestionMetric("registered", System.currentTimeMillis() - startTimeMs);
+        eventPublisher.publishEvent(new com.curiofeed.backend.domain.event.ArticleIngestedEvent(job.getId(), article.getId()));
         return new RegisterArticleResponse(article.getId(), job.getId(), JobStatus.PENDING.name());
     }
 

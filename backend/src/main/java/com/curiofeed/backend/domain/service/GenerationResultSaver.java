@@ -30,7 +30,7 @@ public class GenerationResultSaver {
     }
 
     @Transactional
-    public void saveContent(UUID articleId, DifficultyLevel level, String content) {
+    public ArticleContent saveContent(UUID articleId, DifficultyLevel level, String content) {
         ArticleContent articleContent = contentRepository.findByArticleIdAndLevel(articleId, level)
                 .orElseGet(() -> {
                     System.out.println("DEBUG: GenerationResultSaver: Article not found in contentRepository. Fetching from articleRepository with ID: " + articleId);
@@ -50,7 +50,7 @@ public class GenerationResultSaver {
         quizRepository.flush();
         
         articleContent.updateContent(content);
-        contentRepository.save(articleContent);
+        return contentRepository.save(articleContent);
     }
 
     @Transactional

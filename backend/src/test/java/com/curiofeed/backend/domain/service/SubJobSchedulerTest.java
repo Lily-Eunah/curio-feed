@@ -35,7 +35,7 @@ class SubJobSchedulerTest {
         // useThreeStep=false → uses the legacy SubJobWorker in these tests
         pipelineProperties = new PipelineProperties(3, 10, 3000, 5, null, false);
         // SyncTaskExecutor: 테스트에서 동기 실행 (비동기 없음)
-        scheduler = new SubJobScheduler(subJobRepository, subJobWorker, threeStepSubJobWorker, new SyncTaskExecutor(), pipelineProperties);
+        scheduler = new SubJobScheduler(subJobRepository, subJobWorker, threeStepSubJobWorker, new SyncTaskExecutor(), pipelineProperties, true);
     }
 
     private ArticleGenerationSubJob pendingSubJob(UUID id) {
@@ -64,7 +64,7 @@ class SubJobSchedulerTest {
     @DisplayName("batchSize=2 설정 시 2개만 조회 요청")
     void processPending_respectsBatchSize() {
         pipelineProperties = new PipelineProperties(3, 10, 3000, 2, null, false);
-        scheduler = new SubJobScheduler(subJobRepository, subJobWorker, threeStepSubJobWorker, new SyncTaskExecutor(), pipelineProperties);
+        scheduler = new SubJobScheduler(subJobRepository, subJobWorker, threeStepSubJobWorker, new SyncTaskExecutor(), pipelineProperties, true);
 
         when(subJobRepository.findPendingJobs(any())).thenReturn(List.of());
 

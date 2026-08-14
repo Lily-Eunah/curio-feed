@@ -2,6 +2,7 @@ package com.curiofeed.backend.config;
 
 import com.curiofeed.backend.infrastructure.llm.GeminiLlmClient;
 import com.curiofeed.backend.infrastructure.llm.LlmClient;
+import com.curiofeed.backend.infrastructure.llm.MistralLlmClient;
 import com.curiofeed.backend.infrastructure.llm.OllamaLlmClient;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,6 +36,23 @@ public class LlmClientConfig {
         return new GeminiLlmClient(p, fallback, geminiBuilder(p), meterRegistry);
     }
 
+    // ── Mistral beans (active when ai.provider=mistral) ────────────────────
+
+    @Bean
+    @Primary
+    @ConditionalOnProperty(name = "ai.provider", havingValue = "mistral")
+    public LlmClient primaryMistralClient(MistralProperties p, MeterRegistry meterRegistry) {
+        return new MistralLlmClient(p, p.model(), mistralBuilder(p), meterRegistry);
+    }
+
+    @Bean
+    @Qualifier("fallbackLlmClient")
+    @ConditionalOnProperty(name = "ai.provider", havingValue = "mistral")
+    public LlmClient fallbackMistralClient(MistralProperties p, MeterRegistry meterRegistry) {
+        String fallback = p.fallbackModel() != null ? p.fallbackModel() : p.model();
+        return new MistralLlmClient(p, fallback, mistralBuilder(p), meterRegistry);
+    }
+
     // ── Ollama beans (active when ai.provider=ollama or not set) ───────────
 
     @Bean
@@ -55,6 +73,13 @@ public class LlmClientConfig {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private RestClient.Builder geminiBuilder(GeminiProperties p) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(p.connectTimeoutSeconds()));
+        factory.setReadTimeout(Duration.ofSeconds(p.readTimeoutSeconds()));
+        return RestClient.builder().requestFactory(factory);
+    }
+
+    private RestClient.Builder mistralBuilder(MistralProperties p) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(p.connectTimeoutSeconds()));
         factory.setReadTimeout(Duration.ofSeconds(p.readTimeoutSeconds()));

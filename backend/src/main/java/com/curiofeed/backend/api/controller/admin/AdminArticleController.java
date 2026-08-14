@@ -10,6 +10,7 @@ import com.curiofeed.backend.domain.repository.*;
 import com.curiofeed.backend.domain.service.ArticleIngestionService;
 import com.curiofeed.backend.domain.service.ArticleIngestionService.ArticleAlreadyExistsException;
 import com.curiofeed.backend.domain.service.StepRetryService;
+import com.curiofeed.backend.domain.service.SubJobScheduler;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,7 @@ public class AdminArticleController {
     private final ArticleGenerationSubJobRepository subJobRepository;
     private final ArticleGenerationStepJobRepository stepJobRepository;
     private final StepRetryService stepRetryService;
+    private final SubJobScheduler subJobScheduler;
 
     public AdminArticleController(
             ArticleIngestionService ingestionService,
@@ -40,13 +42,15 @@ public class AdminArticleController {
             ArticleGenerationJobRepository jobRepository,
             ArticleGenerationSubJobRepository subJobRepository,
             ArticleGenerationStepJobRepository stepJobRepository,
-            StepRetryService stepRetryService) {
+            StepRetryService stepRetryService,
+            SubJobScheduler subJobScheduler) {
         this.ingestionService = ingestionService;
         this.articleRepository = articleRepository;
         this.jobRepository = jobRepository;
         this.subJobRepository = subJobRepository;
         this.stepJobRepository = stepJobRepository;
         this.stepRetryService = stepRetryService;
+        this.subJobScheduler = subJobScheduler;
     }
 
     /**
@@ -204,6 +208,7 @@ public class AdminArticleController {
         }
 
         subJobRepository.resetToPendingWithRetryReset(subJobId);
+        subJobScheduler.processPending();
         return ResponseEntity.noContent().build();
     }
 
@@ -236,6 +241,7 @@ public class AdminArticleController {
 
         try {
             stepRetryService.retryStep(subJob, step);
+            subJobScheduler.processPending();
             return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
