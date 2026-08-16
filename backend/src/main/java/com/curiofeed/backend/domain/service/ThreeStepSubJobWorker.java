@@ -165,26 +165,24 @@ public class ThreeStepSubJobWorker {
         int originalWordCount = countWords(originalContent);
 
         // ── Step 0: SOURCE_DIGEST (Mandatory for copyright safety) ──────────────
-        String sourceText = originalContent;
-        boolean isDigestUsed = false;
-
         ArticleGenerationStepJob digestStep = getOrCreateStep(subJob, GenerationStepType.SOURCE_DIGEST);
 
-        if (!digestStep.isCompleted()) {
-            GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalTitle, originalContent);
-            if (digestData == null) return; // hard fail
-            sourceText = formatDigest(digestData);
-            isDigestUsed = true;
-            
-            updateArticleTitleSafely(articleId, digestData.suggestedTitle());
-        } else {
-            // Need to retrieve digestData from DB if already completed, but since digest output isn't fully persisted as a standalone entity currently,
-            // we will just proceed with the original text as fallback or we would need to store digest string. 
-            // However, assuming CONTENT step will use its own completed logic, this is fine for now.
-            // Actually, if we just set isDigestUsed = true, CONTENT step will fetch its own output if already completed.
-            isDigestUsed = true;
-            log.info("[subJob={} level={}] SOURCE_DIGEST step already completed, resuming", subJobId, level);
+        if (digestStep.isCompleted()) {
+            // The digest text itself is not persisted, so a resumed run cannot restore it.
+            // Re-run the step instead of falling back to the original article: CONTENT is told
+            // it is working from a digest, and handing it the full source instead is exactly
+            // how verbatim copying gets past the copyright gate.
+            log.info("[subJob={} level={}] SOURCE_DIGEST already completed but its text is not persisted — re-running", subJobId, level);
+            digestStep.resetToPending();
+            stepJobRepository.save(digestStep);
         }
+
+        GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalTitle, originalContent);
+        if (digestData == null) return; // hard fail
+        String sourceText = formatDigest(digestData);
+        boolean isDigestUsed = true;
+
+        updateArticleTitleSafely(articleId, digestData.suggestedTitle());
 
         // ── Step 1: CONTENT ───────────────────────────────────────────────────
         ArticleGenerationStepJob contentStep = getOrCreateStep(subJob, GenerationStepType.CONTENT);
