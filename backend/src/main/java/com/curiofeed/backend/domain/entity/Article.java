@@ -64,6 +64,16 @@ public class Article extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String originalContent;
 
+    /**
+     * Serialized SOURCE_DIGEST output, shared by every difficulty level of this article.
+     *
+     * <p>The digest is derived only from the title and original content, so it is identical
+     * for EASY/MEDIUM/HARD. Persisting it lets a resumed sub-job restore it instead of
+     * re-running the step, and lets the other two levels skip the call entirely.
+     */
+    @Column(name = "source_digest", columnDefinition = "TEXT")
+    private String sourceDigest;
+
     @Version
     private long version;
 
@@ -106,6 +116,10 @@ public class Article extends BaseEntity {
 
     public void updateTitle(String newTitle) {
         this.title = newTitle;
+    }
+
+    public void storeSourceDigest(String serializedDigest) {
+        this.sourceDigest = serializedDigest;
     }
 
     public void incrementViewCount() {

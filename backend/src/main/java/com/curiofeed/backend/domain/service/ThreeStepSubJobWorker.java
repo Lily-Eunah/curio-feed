@@ -165,24 +165,32 @@ public class ThreeStepSubJobWorker {
         int originalWordCount = countWords(originalContent);
 
         // ── Step 0: SOURCE_DIGEST (Mandatory for copyright safety) ──────────────
+        // The digest depends only on the title and original content, so it is the same for all
+        // three levels. Reuse the stored one when present: that covers both resumed sub-jobs
+        // (which could not restore it before) and the other two levels of a fresh article.
         ArticleGenerationStepJob digestStep = getOrCreateStep(subJob, GenerationStepType.SOURCE_DIGEST);
+        GenerationResult.SourceDigestData digestData = loadStoredDigest(articleId);
 
-        if (digestStep.isCompleted()) {
-            // The digest text itself is not persisted, so a resumed run cannot restore it.
-            // Re-run the step instead of falling back to the original article: CONTENT is told
-            // it is working from a digest, and handing it the full source instead is exactly
-            // how verbatim copying gets past the copyright gate.
-            log.info("[subJob={} level={}] SOURCE_DIGEST already completed but its text is not persisted — re-running", subJobId, level);
-            digestStep.resetToPending();
-            stepJobRepository.save(digestStep);
+        if (digestData != null) {
+            log.info("[subJob={} level={}] Reusing stored SOURCE_DIGEST", subJobId, level);
+            if (!digestStep.isCompleted()) {
+                digestStep.markCompleted("PASS", promptBuilder.getPromptVersion(), primaryLlmClient.getModelName(), null);
+                stepJobRepository.save(digestStep);
+            }
+        } else {
+            if (digestStep.isCompleted()) {
+                // Completed by an older run that predates digest persistence: nothing to restore.
+                digestStep.resetToPending();
+                stepJobRepository.save(digestStep);
+            }
+            digestData = executeSourceDigestStep(digestStep, subJob, originalTitle, originalContent);
+            if (digestData == null) return; // hard fail
+            storeDigest(articleId, digestData);
+            updateArticleTitleSafely(articleId, digestData.suggestedTitle());
         }
 
-        GenerationResult.SourceDigestData digestData = executeSourceDigestStep(digestStep, subJob, originalTitle, originalContent);
-        if (digestData == null) return; // hard fail
         String sourceText = formatDigest(digestData);
         boolean isDigestUsed = true;
-
-        updateArticleTitleSafely(articleId, digestData.suggestedTitle());
 
         // ── Step 1: CONTENT ───────────────────────────────────────────────────
         ArticleGenerationStepJob contentStep = getOrCreateStep(subJob, GenerationStepType.CONTENT);
@@ -226,6 +234,35 @@ public class ThreeStepSubJobWorker {
         subJobRepository.save(subJob);
         aggregator.aggregate(subJob.getJob().getId());
         log.info("[subJob={} level={}] 3-step pipeline COMPLETED", subJobId, level);
+    }
+
+    /** Returns the digest stored on the article, or {@code null} if there is none or it is unreadable. */
+    private GenerationResult.SourceDigestData loadStoredDigest(UUID articleId) {
+        try {
+            String stored = articleRepository.findById(articleId)
+                    .map(Article::getSourceDigest)
+                    .orElse(null);
+            if (stored == null || stored.isBlank()) return null;
+
+            GenerationResult.SourceDigestData digest =
+                    objectMapper.readValue(stored, GenerationResult.SourceDigestData.class);
+            return (digest != null && digest.centralStory() != null) ? digest : null;
+        } catch (Exception e) {
+            log.warn("[articleId={}] Stored SOURCE_DIGEST could not be read, regenerating: {}", articleId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void storeDigest(UUID articleId, GenerationResult.SourceDigestData digest) {
+        try {
+            Article article = articleRepository.findById(articleId).orElse(null);
+            if (article == null) return;
+            article.storeSourceDigest(objectMapper.writeValueAsString(digest));
+            articleRepository.save(article);
+        } catch (Exception e) {
+            // Losing the cache only costs an extra call on the next level; never fail the step.
+            log.warn("[articleId={}] Failed to persist SOURCE_DIGEST: {}", articleId, e.getMessage());
+        }
     }
 
     private void updateArticleTitleSafely(UUID articleId, String suggestedTitle) {
