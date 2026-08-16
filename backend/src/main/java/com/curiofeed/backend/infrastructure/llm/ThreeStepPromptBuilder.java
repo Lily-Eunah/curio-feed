@@ -35,21 +35,34 @@ public class ThreeStepPromptBuilder {
                 COMPRESSION RULES:
                 1. DO NOT write a story. Extract core information in bullet points or short sentences.
                 2. PRESERVE: Central story, main actors, main cause-effect relationships, and the final outcome.
-                3. REMOVE: Minor examples, repeated details, secondary quotes, scene-setting descriptions, and non-essential background.
-                4. DO NOT add any information or interpretations not present in the original article.
-                5. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
-                6. Generate a completely new, engaging English title based solely on the extracted facts.
+                3. KEEP 1-2 HUMAN DETAILS. A digest of pure statistics produces a lifeless article.
+                   Pick the one or two concrete, specific details that make the central story real to a
+                   reader — what a named person experienced, a price they paid, a number that lands.
+                   Report them in your own words as indirect speech. NEVER copy the original wording:
+                   write `a British mother said her family ate a street-food meal for about one pound`,
+                   not the sentence the article used. Put these in humanDetails, not coreFacts.
+                4. REMOVE: repeated examples, third and later quotes making the same point,
+                   scene-setting description, and non-essential background.
+                5. DO NOT add any information or interpretations not present in the original article.
+                6. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
+                7. Generate a completely new, engaging English title based solely on the extracted facts.
                    ORIGINAL TITLE (do NOT reuse any phrase of 3 or more consecutive words from this): "%s"
                    Use a different angle, verb, or structure to express the same facts.
+                   Keep it plain and concrete. No metaphors stacked on metaphors — a reader at A2 level
+                   must understand the title without decoding imagery.
 
                 Return ONLY this JSON:
                 {
                   "sourceDigest": {
-                    "suggestedTitle": "A catchy, original English news title",
+                    "suggestedTitle": "A clear, original English news title",
                     "centralStory": "1-2 sentences summarizing the main event",
                     "coreFacts": ["Fact 1", "Fact 2", ...],
                     "supportingDetails": ["Detail 1", ...],
-                    "omittedDetails": ["Briefly list what was removed (e.g., 'specific weather descriptions', 'secondary quotes from neighbors')"]
+                    "humanDetails": [
+                      {"who": "who this is, e.g. 'a British mother who moved to Bangkok'",
+                       "what": "what they did or experienced, in YOUR words, never the article's"}
+                    ],
+                    "omittedDetails": ["Briefly list what was removed (e.g., 'specific weather descriptions', 'repeated quotes from other residents')"]
                   }
                 }
 
@@ -166,9 +179,12 @@ public class ThreeStepPromptBuilder {
 
                 CONTENT SELECTION RULES:
                 1. Preserve the central story, main actors, main event, main causes, and main consequences.
-                2. Omit minor examples, repeated details, secondary quotes, and non-essential background.
-                3. Do NOT add information not found in the source.
-                4. Natural flowing prose only — no bullet points, headers, or lists.
+                2. Work at least one HUMAN DETAIL from the source into the article — a named person and
+                   what they did, paid, or experienced. A piece built only from rankings and percentages
+                   is accurate and unreadable. Report it as indirect speech in your own words.
+                3. Omit repeated examples and non-essential background.
+                4. Do NOT add information not found in the source.
+                5. Natural flowing prose only — no bullet points, headers, or lists.
 
                 PARAGRAPH FORMAT — REQUIRED:
                 • Write the article in 3 to 4 natural paragraphs.
@@ -517,11 +533,22 @@ public class ThreeStepPromptBuilder {
         digestProps.put("centralStory", Map.of("type", "string"));
         digestProps.put("coreFacts", Map.of("type", "array", "items", Map.of("type", "string")));
         digestProps.put("supportingDetails", Map.of("type", "array", "items", Map.of("type", "string")));
+
+        Map<String, Object> humanDetailProps = new LinkedHashMap<>();
+        humanDetailProps.put("who", Map.of("type", "string"));
+        humanDetailProps.put("what", Map.of("type", "string"));
+        Map<String, Object> humanDetailObj = new LinkedHashMap<>();
+        humanDetailObj.put("type", "object");
+        humanDetailObj.put("required", List.of("who", "what"));
+        humanDetailObj.put("properties", humanDetailProps);
+        humanDetailObj.put("additionalProperties", false);
+        digestProps.put("humanDetails", Map.of("type", "array", "items", humanDetailObj));
+
         digestProps.put("omittedDetails", Map.of("type", "array", "items", Map.of("type", "string")));
 
         Map<String, Object> digestObj = new LinkedHashMap<>();
         digestObj.put("type", "object");
-        digestObj.put("required", List.of("suggestedTitle", "centralStory", "coreFacts", "supportingDetails", "omittedDetails"));
+        digestObj.put("required", List.of("suggestedTitle", "centralStory", "coreFacts", "supportingDetails", "humanDetails", "omittedDetails"));
         digestObj.put("properties", digestProps);
         digestObj.put("additionalProperties", false);
 

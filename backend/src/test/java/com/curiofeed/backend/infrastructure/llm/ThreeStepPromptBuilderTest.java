@@ -174,6 +174,39 @@ class ThreeStepPromptBuilderTest {
     }
 
     @Test
+    @DisplayName("buildSourceDigestPrompt: 사람 디테일을 1~2개 보존하되 원문 표현은 쓰지 말라고 지시한다")
+    void buildSourceDigestPrompt_keepsHumanDetailAsIndirectSpeech() {
+        String prompt = builder.buildSourceDigestPrompt("Original Title", "Original article body");
+
+        assertThat(prompt).contains("KEEP 1-2 HUMAN DETAILS");
+        assertThat(prompt).contains("indirect speech");
+        assertThat(prompt).contains("NEVER copy the original wording");
+        assertThat(prompt).contains("humanDetails");
+    }
+
+    @Test
+    @DisplayName("sourceDigestSchema: humanDetails가 who/what 구조로 필수 필드에 포함된다")
+    void sourceDigestSchema_requiresHumanDetails() {
+        var schema = ThreeStepPromptBuilder.sourceDigestSchema();
+        var digest = (java.util.Map<?, ?>) ((java.util.Map<?, ?>) schema.get("properties")).get("sourceDigest");
+
+        assertThat(digest.get("required").toString()).contains("humanDetails");
+
+        var items = (java.util.Map<?, ?>) ((java.util.Map<?, ?>) ((java.util.Map<?, ?>) digest.get("properties"))
+                .get("humanDetails")).get("items");
+        assertThat(items.get("required").toString()).contains("who").contains("what");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildContentPrompt: 사람 디테일을 최소 1개 넣으라는 지침이 모든 난이도에 포함된다")
+    void buildContentPrompt_requiresAHumanDetail(DifficultyLevel level) {
+        String prompt = builder.buildContentPrompt("source text", level, true);
+        assertThat(prompt).contains("Work at least one HUMAN DETAIL");
+        assertThat(prompt).doesNotContain("Omit minor examples, repeated details, secondary quotes");
+    }
+
+    @Test
     @DisplayName("buildContentRetryPrompt: retryReason이 null이어도 NPE 없이 기본 프롬프트를 만든다")
     void buildContentRetryPrompt_nullRetryReason_doesNotThrow() {
         // Safety and parse failures leave retryReason unset; switching on it used to throw NPE
