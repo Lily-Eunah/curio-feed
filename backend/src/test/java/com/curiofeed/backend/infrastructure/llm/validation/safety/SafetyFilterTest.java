@@ -38,16 +38,41 @@ class SafetyFilterTest {
     }
 
     @Test
-    @DisplayName("CopyrightPhraseDetector flags 5-gram verbatim copied phrases")
-    void testCopyrightPhraseDetector() {
+    @DisplayName("CopyrightPhraseDetector flags sustained verbatim reproduction")
+    void testCopyrightPhraseDetector_flagsLongVerbatimRun() {
         CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
 
-        String original = "Scientists at the university discovered a breakthrough energy source in deep sea hydrothermal vents.";
-        String copied = "In recent news, scientists at the university discovered a breakthrough energy source while exploring.";
-        String paraphrased = "Researchers found a novel power mechanism underwater.";
+        String original = "Researchers said the discovery could transform how coastal cities plan for rising sea levels.";
+        String copied = "In the report, researchers said the discovery could transform how coastal cities plan for rising sea levels.";
+        String paraphrased = "Scientists believe the finding may reshape flood planning along the coast.";
 
         assertThat(detector.check(copied, original)).hasSize(1);
         assertThat(detector.check(paraphrased, original)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CopyrightPhraseDetector ignores runs made only of function words")
+    void testCopyrightPhraseDetector_ignoresFunctionWordRuns() {
+        CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
+
+        // "and there is more to it than that" is eight words of pure connective tissue.
+        // Reusing it is not reproduction of protectable expression.
+        String original = "The committee agreed and there is more to it than that in the final report.";
+        String reusing = "Officials noted and there is more to it than that during the briefing.";
+
+        assertThat(detector.check(reusing, original)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CopyrightPhraseDetector tolerates an unavoidable proper-noun sequence")
+    void testCopyrightPhraseDetector_tolerlatesShortUnavoidableOverlap() {
+        CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
+
+        // An official body's name cannot be paraphrased away when reporting the same fact.
+        String original = "The national institute for health and care excellence reviews new treatments every year.";
+        String reporting = "Experts at the national institute for health and care excellence assess them carefully.";
+
+        assertThat(detector.check(reporting, original)).isEmpty();
     }
 
     @Test
