@@ -62,7 +62,16 @@ public class SubJobScheduler {
     @EventListener
     public void onArticleIngested(ArticleIngestedEvent event) {
         log.info("[SubJobScheduler] Event-driven trigger received for job={}, triggering processing", event.jobId());
-        subJobTaskExecutor.execute(this::processAllPendingUntilEmpty);
+        try {
+            subJobTaskExecutor.execute(this::processAllPendingUntilEmpty);
+        } catch (RejectedExecutionException e) {
+            // The executor has no queue and aborts when saturated. This event is published
+            // inside the ingestion transaction, so letting the rejection escape would fail
+            // the registration request with a 500. Rejection only happens while workers are
+            // busy, which means a processAllPendingUntilEmpty drain loop is already running;
+            // it keeps going until no PENDING sub-job is left and so will pick these up too.
+            log.info("[SubJobScheduler] Workers busy, job={} left to the in-flight drain loop", event.jobId());
+        }
     }
 
     /**
