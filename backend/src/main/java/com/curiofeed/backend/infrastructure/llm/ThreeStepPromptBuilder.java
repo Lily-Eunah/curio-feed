@@ -82,32 +82,61 @@ public class ThreeStepPromptBuilder {
                     • Technical jargon beyond B1: briefly clarify in a parenthetical or follow-up phrase.
                     • Idiomatic or culture-specific expressions that a non-native reader would not recognize.
 
-                    • Mix shorter sentences (8-12 words) with medium ones (14-20 words) for natural rhythm.
-                    • Include about 5-6 core facts from the source.
-                    • Target: 200~280 words.
-                    • Absolute hard limit: 320 words.
+                    • Average sentence length about 12 words. Never write a sentence over 22 words.
+                    • One main idea per sentence. At most one subordinate clause.
+                    • Include about 4-5 core facts from the source.
+                    • Target: 180~240 words.
+                    • Absolute hard limit: 280 words.
                     • Paragraph structure: Write EXACTLY 3 paragraphs.
                       Paragraph 1 — the main event (what happened).
                       Paragraph 2 — key details (who did what, immediate consequences).
                       Paragraph 3 — background or broader impact.""";
             case MEDIUM -> """
-                    MEDIUM (B2 level — for learners moving from B1 to B2):
-                    • Natural news-writing style with moderate sentence variety.
-                    • Topic-specific vocabulary is acceptable if context makes it clear.
-                    • Include about 6-8 core facts from the source.
-                    • Preserve the main cause-effect relationships and actor motivations.
-                    • Target: 220~320 words.
+                    MEDIUM — standard news reporting for learners moving from B1 to B2.
+                    This must read as clearly MORE demanding than EASY, not as EASY with a few
+                    longer words. The difference is structural, not decorative.
+
+                    SENTENCE CONSTRUCTION:
+                    • Average sentence length about 18 words. Most sentences carry one subordinate clause.
+                    • Combine related facts into a single sentence instead of listing them separately.
+                      EASY would write: "Panama came first. It scored well on personal finance."
+                      MEDIUM writes:    "Panama took the top spot for the third year running, helped by
+                                        its strong scores for personal finance and working conditions."
+                    • Make cause and effect explicit with connectives: because, which meant, as a result,
+                      even though, while.
+
+                    WHAT MEDIUM ADDS OVER EASY:
+                    • Attribute claims to whoever made them (the survey, the researchers, a named expert).
+                    • Keep one short direct quotation if the source has a memorable one.
+                    • Keep the qualifications and exceptions EASY would drop ("in most cases", "though
+                      the picture differs outside the US").
+                    • Include about 6-7 core facts from the source.
+
+                    • Target: 270~330 words.
                     • Absolute hard limit: 380 words.
                     • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
                       key details, and context or consequences.""";
             case HARD -> """
-                    HARD (C1 level):
-                    • Use advanced vocabulary and varied sentence structures.
-                    • Use formal, precise register with dense information delivery.
-                    • Preserve nuance, expert viewpoints, and causal chains.
-                    • Include about 8-10 core facts from the source.
-                    • Target: 280~420 words.
-                    • Absolute hard limit: 500 words.
+                    HARD — the register of a quality broadsheet feature (BBC long-read, The Economist).
+                    C1 reading level.
+
+                    COMPLEXITY COMES FROM IDEAS AND SYNTAX, NOT FROM RARE WORDS:
+                    • Do NOT swap plain words for rarer synonyms. Write "closely tied to", not
+                      "inextricably linked to"; "sell off unsold stock", not "liquidate stagnant
+                      inventory"; "a secret project called", not "a clandestine initiative dubbed".
+                      Thesaurus prose is a failure, not a success, at this level.
+                    • Difficulty should come from: longer sentences with embedded clauses,
+                      nominalisation, hedged and qualified claims, and information density.
+                    • Use a rarer word ONLY when it is the precise term and a plain one would be vague.
+
+                    WHAT HARD ADDS OVER MEDIUM:
+                    • Competing viewpoints and the tension between them, not just the headline claim.
+                    • The reasoning behind expert positions, not only their conclusions.
+                    • Caveats, limitations, and what remains unresolved.
+                    • Include about 9-11 core facts from the source.
+
+                    • Target: 380~450 words.
+                    • Absolute hard limit: 520 words.
                     • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
                       key details, and context or consequences.""";
         };
@@ -119,6 +148,15 @@ public class ThreeStepPromptBuilder {
 
                 LEVEL REQUIREMENTS:
                 %s
+
+                LEVEL CALIBRATION — these three sentences describe the same fact at each level.
+                Readers are shown them when choosing their level, so your output must match this gradient:
+                  EASY   "Many people are moving to smaller homes to save money and live more simply."
+                  MEDIUM "A growing number of young professionals are choosing smaller living spaces as
+                          urban housing costs continue to rise."
+                  HARD   "An emerging demographic shift toward compact urban dwelling reflects broader
+                          anxieties about affordability, sustainability, and the perceived superfluity
+                          of space."
 
                 STRICT LENGTH POLICY — HIGHEST PRIORITY:
                 1. The absolute hard limit is mandatory. NEVER exceed it.

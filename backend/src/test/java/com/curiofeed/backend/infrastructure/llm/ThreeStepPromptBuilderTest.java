@@ -47,15 +47,15 @@ class ThreeStepPromptBuilderTest {
     @DisplayName("buildContentPrompt: EASY 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_easyWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.EASY, false);
-        assertThat(prompt).contains("200~280 words");
-        assertThat(prompt).contains("320 words");
+        assertThat(prompt).contains("180~240 words");
+        assertThat(prompt).contains("280 words");
     }
 
     @Test
     @DisplayName("buildContentPrompt: MEDIUM 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_mediumWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.MEDIUM, false);
-        assertThat(prompt).contains("220~320 words");
+        assertThat(prompt).contains("270~330 words");
         assertThat(prompt).contains("380 words");
     }
 
@@ -63,8 +63,33 @@ class ThreeStepPromptBuilderTest {
     @DisplayName("buildContentPrompt: HARD 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_hardWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.HARD, false);
-        assertThat(prompt).contains("280~420 words");
-        assertThat(prompt).contains("500 words");
+        assertThat(prompt).contains("380~450 words");
+        assertThat(prompt).contains("520 words");
+    }
+
+    @Test
+    @DisplayName("buildContentPrompt: MEDIUM은 EASY와 구조적으로 다르라는 지침을 받는다")
+    void buildContentPrompt_mediumIsStructurallyDistinctFromEasy() {
+        String prompt = builder.buildContentPrompt("source text", DifficultyLevel.MEDIUM, false);
+        assertThat(prompt).contains("MORE demanding than EASY");
+        assertThat(prompt).contains("structural, not decorative");
+    }
+
+    @Test
+    @DisplayName("buildContentPrompt: HARD는 유의어 치환을 금지당한다")
+    void buildContentPrompt_hardForbidsThesaurusProse() {
+        String prompt = builder.buildContentPrompt("source text", DifficultyLevel.HARD, false);
+        assertThat(prompt).contains("Do NOT swap plain words for rarer synonyms");
+        assertThat(prompt).contains("Thesaurus prose is a failure");
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifficultyLevel.class)
+    @DisplayName("buildContentPrompt: 모든 난이도에 온보딩과 동일한 레벨 보정 예시가 포함된다")
+    void buildContentPrompt_containsLevelCalibration(DifficultyLevel level) {
+        String prompt = builder.buildContentPrompt("source text", level, false);
+        assertThat(prompt).contains("LEVEL CALIBRATION");
+        assertThat(prompt).contains("Many people are moving to smaller homes");
     }
 
     @Test
