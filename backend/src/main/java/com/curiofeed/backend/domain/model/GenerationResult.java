@@ -33,8 +33,15 @@ public record GenerationResult(
             String centralStory,
             List<String> coreFacts,
             List<String> supportingDetails,
+            List<HumanDetail> humanDetails,
             List<String> omittedDetails
     ) {}
+
+    /**
+     * A concrete, person-level detail carried through to the article so it does not read as
+     * pure statistics. Restated by the digest in its own words — never the source's phrasing.
+     */
+    public record HumanDetail(String who, String what) {}
 
     public record VocabularyData(
             String word,

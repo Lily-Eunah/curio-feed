@@ -112,7 +112,7 @@ class GenerationResultTest {
     @Test
     @DisplayName("hasSourceDigest: digest가 있으면 true")
     void hasSourceDigest_returnsTrue() {
-        var digest = new GenerationResult.SourceDigestData(null, "story", List.of(), List.of(), List.of());
+        var digest = new GenerationResult.SourceDigestData(null, "story", List.of(), List.of(), List.of(), List.of());
         GenerationResult result = new GenerationResult("content", List.of(), List.of(), List.of(), digest);
         assertThat(result.hasSourceDigest()).isTrue();
     }

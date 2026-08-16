@@ -446,14 +446,27 @@ public class ThreeStepSubJobWorker {
                 - %s
                 SUPPORTING DETAILS:
                 - %s
+                HUMAN DETAILS (use at least one so the article is not pure statistics):
+                - %s
                 OMITTED DETAILS (for reference):
                 - %s
                 """.formatted(
                 digest.centralStory(),
                 String.join("\n- ", digest.coreFacts()),
                 String.join("\n- ", digest.supportingDetails()),
+                formatHumanDetails(digest.humanDetails()),
                 String.join("\n- ", digest.omittedDetails())
         );
+    }
+
+    /** Older digests persisted before humanDetails existed deserialize with a null list. */
+    private String formatHumanDetails(List<GenerationResult.HumanDetail> details) {
+        if (details == null || details.isEmpty()) {
+            return "(none available)";
+        }
+        return details.stream()
+                .map(d -> d.who() + " — " + d.what())
+                .collect(java.util.stream.Collectors.joining("\n- "));
     }
 
     private static final int RECENT_VOCAB_LOOKBACK = 50; // ~10 articles × 5 words per level
