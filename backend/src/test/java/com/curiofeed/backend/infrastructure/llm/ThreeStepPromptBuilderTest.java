@@ -1,6 +1,7 @@
 package com.curiofeed.backend.infrastructure.llm;
 
 import com.curiofeed.backend.domain.entity.DifficultyLevel;
+import com.curiofeed.backend.infrastructure.llm.validation.ContentValidationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -145,5 +146,22 @@ class ThreeStepPromptBuilderTest {
         String prompt = builder.buildQuizRetryPrompt("content", "[]", DifficultyLevel.MEDIUM, "q2_not_reasoning");
         assertThat(prompt).contains("CORRECTION");
         assertThat(prompt).containsAnyOf("passage reasoning", "cause/effect");
+    }
+
+    @Test
+    @DisplayName("buildContentRetryPrompt: retryReason이 null이어도 NPE 없이 기본 프롬프트를 만든다")
+    void buildContentRetryPrompt_nullRetryReason_doesNotThrow() {
+        // Safety and parse failures leave retryReason unset; switching on it used to throw NPE
+        // and burn a retry attempt without ever reaching the LLM.
+        ContentValidationResult result = ContentValidationResult.builder()
+                .success(false)
+                .level(DifficultyLevel.EASY)
+                .retryReason(null)
+                .build();
+
+        String prompt = builder.buildContentRetryPrompt("source text", DifficultyLevel.EASY, result, true);
+
+        assertThat(prompt).contains("3 to 4 natural paragraphs");
+        assertThat(prompt).doesNotContain("CORRECTION");
     }
 }

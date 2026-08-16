@@ -386,7 +386,9 @@ public class ThreeStepPromptBuilder {
         int prefMin = result.getPreferredMin();
         int prefMax = result.getPreferredMax();
 
-        String correction = switch (retryReason) {
+        // retryReason is only set for word-count failures; a safety or parse failure leaves it
+        // null, and switching on null throws NPE and burns the retry attempt.
+        String correction = switch (retryReason == null ? "" : retryReason) {
             case "too_short" -> """
                     
                     ⚠ CORRECTION: The previous draft was too short (%d words, hard minimum is %d).
