@@ -58,20 +58,20 @@ class ThreeStepPipelineLogicTest {
 
         assertThat(prompt).contains("compressed SOURCE DIGEST");
         assertThat(prompt).contains("ONLY the facts in the digest");
-        assertThat(prompt).contains("Absolute hard limit: 320 words");
+        assertThat(prompt).contains("Absolute hard limit: 280 words");
         assertThat(prompt).contains(digest);
     }
 
     @Test
     void testContentValidationResultMetadata() {
-        String content = "Word ".repeat(350); // Too long for EASY (hard limit 320)
+        String content = "Word ".repeat(350); // Too long for EASY (hard limit 280)
         ContentValidationResult result = contentValidator.validate(content, DifficultyLevel.EASY);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getRetryReason()).isEqualTo("too_long");
         assertThat(result.getActualWordCount()).isEqualTo(350);
-        assertThat(result.getPreferredMax()).isEqualTo(260); // Preferred max
-        assertThat(result.getHardMax()).isEqualTo(320); // Hard limit
+        assertThat(result.getPreferredMax()).isEqualTo(240); // Preferred max
+        assertThat(result.getHardMax()).isEqualTo(280); // Hard limit
         assertThat(result.getMessage()).contains("HARD FAIL: content too long");
     }
 
@@ -81,9 +81,9 @@ class ThreeStepPipelineLogicTest {
                 .retryReason("too_long")
                 .actualWordCount(350)
                 .preferredMin(180)
-                .preferredMax(260)
-                .hardMin(160)
-                .hardMax(320)
+                .preferredMax(240)
+                .hardMin(150)
+                .hardMax(280)
                 .status(ContentValidationResult.ValidationStatus.TOO_LONG_HARD_FAIL)
                 .errors(List.of("too long"))
                 .build();
@@ -91,8 +91,8 @@ class ThreeStepPipelineLogicTest {
         String retryPrompt = promptBuilder.buildContentRetryPrompt("Source text", DifficultyLevel.EASY, result, true);
 
         assertThat(retryPrompt).contains("350 words");
-        assertThat(retryPrompt).contains("320 words"); // hard max
-        assertThat(retryPrompt).contains("180~260 words"); // preferred range
+        assertThat(retryPrompt).contains("280 words"); // hard max
+        assertThat(retryPrompt).contains("180~240 words"); // preferred range
         assertThat(retryPrompt).contains("STRICT WORD LIMIT IS HIGHER PRIORITY");
         
         // Forbidden phrases

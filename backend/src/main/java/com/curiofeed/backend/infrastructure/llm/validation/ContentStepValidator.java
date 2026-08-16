@@ -15,20 +15,20 @@ import java.util.Map;
 public class ContentStepValidator {
 
     // Hard limits: outside this range → hard fail (retry Step 1).
-    // EASY: floor 160, ceiling 320
-    // MEDIUM: floor 190, ceiling 380
-    // HARD: floor 240, ceiling 500
+    // Kept in sync with the per-level targets in ThreeStepPromptBuilder.buildContentPrompt.
     private static final Map<DifficultyLevel, int[]> HARD_RANGES = Map.of(
-        DifficultyLevel.EASY,   new int[]{160, 320},
-        DifficultyLevel.MEDIUM, new int[]{190, 380},
-        DifficultyLevel.HARD,   new int[]{240, 500}
+        DifficultyLevel.EASY,   new int[]{150, 280},
+        DifficultyLevel.MEDIUM, new int[]{230, 380},
+        DifficultyLevel.HARD,   new int[]{330, 520}
     );
 
     // Preferred (soft warning) ranges — what the prompt targets.
+    // These must NOT overlap between levels: when they did, EASY and MEDIUM converged on the
+    // same length and the levels became hard to tell apart.
     private static final Map<DifficultyLevel, int[]> PREFERRED_RANGES = Map.of(
-        DifficultyLevel.EASY,   new int[]{180, 260},
-        DifficultyLevel.MEDIUM, new int[]{220, 320},
-        DifficultyLevel.HARD,   new int[]{280, 420}
+        DifficultyLevel.EASY,   new int[]{180, 240},
+        DifficultyLevel.MEDIUM, new int[]{270, 330},
+        DifficultyLevel.HARD,   new int[]{380, 450}
     );
 
     /**
