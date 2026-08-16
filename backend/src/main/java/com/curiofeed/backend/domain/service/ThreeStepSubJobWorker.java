@@ -189,7 +189,7 @@ public class ThreeStepSubJobWorker {
         String generatedContent;
 
         if (!contentStep.isCompleted()) {
-            generatedContent = executeContentStep(contentStep, subJob, articleId, level, sourceText, isDigestUsed);
+            generatedContent = executeContentStep(contentStep, subJob, articleId, level, sourceText, isDigestUsed, originalContent);
             if (generatedContent == null) return; // hard fail handled inside
         } else {
             generatedContent = contentRepository.findByArticleIdAndLevel(articleId, level)
@@ -253,7 +253,8 @@ public class ThreeStepSubJobWorker {
     private String executeContentStep(ArticleGenerationStepJob step,
                                       ArticleGenerationSubJob subJob,
                                       UUID articleId, DifficultyLevel level,
-                                      String sourceText, boolean isDigestUsed) {
+                                      String sourceText, boolean isDigestUsed,
+                                      String originalContent) {
         UUID subJobId = subJob.getId();
         log.info("[subJob={} level={}] Running CONTENT step (isDigestUsed={})", subJobId, level, isDigestUsed);
         step.markProcessing();
@@ -298,8 +299,11 @@ public class ThreeStepSubJobWorker {
                     }
                 }
 
-                // Safety Filter Check (PII, Toxicity, Copyright 5-gram copying)
-                List<String> safetyViolations = safetyFilter.validate(content, sourceText);
+                // Safety Filter Check (PII, Toxicity, Copyright 5-gram copying).
+                // Compare against the ORIGINAL article, never against sourceText: sourceText is
+                // the digest, and CONTENT is explicitly told to write from it, so checking against
+                // it penalises the behaviour we asked for while never guarding the actual source.
+                List<String> safetyViolations = safetyFilter.validate(content, originalContent);
                 if (!safetyViolations.isEmpty()) {
                     String safetyErrorMsg = String.join("; ", safetyViolations);
                     log.warn("[subJob={} level={}] Safety violations detected: {}", subJobId, level, safetyErrorMsg);
