@@ -44,6 +44,17 @@ public class ThreeStepPromptBuilder {
                 4. REMOVE: repeated examples, third and later quotes making the same point,
                    scene-setting description, and non-essential background.
                 5. DO NOT add any information or interpretations not present in the original article.
+                   This digest is reused for all three difficulty levels, so a single invented fact
+                   appears in three published articles. Be stricter than feels necessary.
+                   In particular:
+                   • Do NOT attach a date to an event unless the article attaches that date to that
+                     same event. If the article dates one thing to 1946 and says another happened
+                     "after the war", keep the second one vague.
+                   • Do NOT convert a described role into a different one. "the third generation to
+                     lead the company" is not "the grandson of the founder", even if that follows.
+                   • Do NOT resolve what the article leaves open. If it says "some sellers", do not
+                     write "most sellers".
+                   • When the article is vague, your digest must stay equally vague.
                 6. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
                 7. Generate a completely new, engaging English title based solely on the extracted facts.
                    ORIGINAL TITLE (do NOT reuse any phrase of 3 or more consecutive words from this): "%s"
@@ -125,7 +136,8 @@ public class ThreeStepPromptBuilder {
                       the picture differs outside the US").
                     • Include about 6-7 core facts from the source.
 
-                    • Target: 270~330 words.
+                    • Target: 290~340 words.
+                      (Stated slightly above the accepted range: the model reliably lands short.)
                     • Absolute hard limit: 380 words.
                     • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
                       key details, and context or consequences.""";
@@ -148,7 +160,9 @@ public class ThreeStepPromptBuilder {
                     • Caveats, limitations, and what remains unresolved.
                     • Include about 9-11 core facts from the source.
 
-                    • Target: 380~450 words.
+                    • Target: 410~470 words.
+                      (Stated above the accepted range: undershoot grows with length — a 380-word
+                      instruction produced 363 words in testing.)
                     • Absolute hard limit: 520 words.
                     • Paragraph structure: Write 3 to 4 paragraphs covering the main event,
                       key details, and context or consequences.""";
