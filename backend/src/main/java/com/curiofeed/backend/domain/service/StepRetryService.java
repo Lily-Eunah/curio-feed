@@ -56,20 +56,29 @@ public class StepRetryService {
 
         switch (stepType) {
             case SOURCE_DIGEST -> {
-                // The digest is persisted on the article and reused by every level, so resetting the
-                // step alone would hand the same stored digest straight back. Clear it too, or a
-                // regenerate silently keeps whatever the previous prompt version produced.
-                log.info("[telemetry] subJobId={} level={} retryStep=SOURCE_DIGEST invalidatedSteps=[ALL] clearedStoredDigest=true",
-                        subJobId, level);
+                // Retrying this step means the digest itself is not trustworthy, and every level was
+                // written from it. Levels that "succeeded" succeeded from material we are now
+                // discarding, so regenerating one of them would leave the article built from two
+                // different digests with nothing on screen to show it. Reset the whole job.
+                //
+                // Note this is reached through a sub-job scoped URL but deliberately acts on the
+                // article: the digest is stored per article and shared by all three levels.
+                log.info("[telemetry] articleId={} retryStep=SOURCE_DIGEST scope=ALL_SUB_JOBS clearedStoredDigest=true",
+                        articleId);
                 articleRepository.findById(articleId).ifPresent(article -> {
                     article.storeSourceDigest(null);
                     articleRepository.save(article);
                 });
-                resetOrDeleteStep(subJobId, GenerationStepType.SOURCE_DIGEST);
-                resetOrDeleteStep(subJobId, GenerationStepType.CONTENT);
-                resetOrDeleteStep(subJobId, GenerationStepType.VOCABULARY);
-                resetOrDeleteStep(subJobId, GenerationStepType.QUIZ);
-                clearSavedContent(articleId, level);
+                for (ArticleGenerationSubJob sibling : subJobRepository.findByJobId(subJob.getJob().getId())) {
+                    UUID siblingId = sibling.getId();
+                    for (GenerationStepType step : GenerationStepType.values()) {
+                        resetOrDeleteStep(siblingId, step);
+                    }
+                    clearSavedContent(articleId, sibling.getLevel());
+                    if (!siblingId.equals(subJobId)) {
+                        subJobRepository.resetToPendingWithRetryReset(siblingId);
+                    }
+                }
             }
             case CONTENT -> {
                 // Wipe all step state and saved data; re-run from scratch

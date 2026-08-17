@@ -52,11 +52,13 @@ describe('StatusBadge', () => {
     expect(badge.className).toMatch(/green/);
   });
 
-  it('renders ARCHIVED with gray styling', () => {
+  it('renders ARCHIVED with amber styling, distinct from FAILED', () => {
     render(<StatusBadge status="ARCHIVED" />);
     const badge = screen.getByText('Archived');
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toMatch(/gray/);
+    // Amber, not red: archiving is deliberate, and red already means FAILED.
+    expect(badge.className).toMatch(/amber/);
+    expect(badge.className).not.toMatch(/red/);
   });
 
   it('falls back to raw status string for unknown status', () => {

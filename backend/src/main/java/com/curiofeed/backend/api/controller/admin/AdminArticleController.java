@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ public class AdminArticleController {
     private final ArticleGenerationStepJobRepository stepJobRepository;
     private final StepRetryService stepRetryService;
     private final SubJobScheduler subJobScheduler;
+    private final ArticleContentRepository contentRepository;
 
     public AdminArticleController(
             ArticleIngestionService ingestionService,
@@ -43,7 +45,8 @@ public class AdminArticleController {
             ArticleGenerationSubJobRepository subJobRepository,
             ArticleGenerationStepJobRepository stepJobRepository,
             StepRetryService stepRetryService,
-            SubJobScheduler subJobScheduler) {
+            SubJobScheduler subJobScheduler,
+            ArticleContentRepository contentRepository) {
         this.ingestionService = ingestionService;
         this.articleRepository = articleRepository;
         this.jobRepository = jobRepository;
@@ -51,6 +54,7 @@ public class AdminArticleController {
         this.stepJobRepository = stepJobRepository;
         this.stepRetryService = stepRetryService;
         this.subJobScheduler = subJobScheduler;
+        this.contentRepository = contentRepository;
     }
 
     /**
@@ -65,29 +69,24 @@ public class AdminArticleController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        Page<AdminArticleListResponse> result;
+        Page<Article> articlePage;
         if (status != null && !status.isBlank()) {
-            ArticleStatus articleStatus = ArticleStatus.valueOf(status);
-            result = articleRepository.findAllByStatus(articleStatus, pageable)
-                    .map(article -> new AdminArticleListResponse(
-                            article.getId(),
-                            article.getSourceTitle(),
-                            article.getSourcePublisher(),
-                            article.getStatus().name(),
-                            article.getCategory().getDisplayName(),
-                            article.getCreatedAt()));
+            articlePage = articleRepository.findAllByStatus(ArticleStatus.valueOf(status), pageable);
         } else {
             // No explicit filter means the working list: archived articles are kept for provenance
             // but stay out of the way until asked for with status=ARCHIVED.
-            result = articleRepository.findAllByStatusNot(ArticleStatus.ARCHIVED, pageable)
-                    .map(article -> new AdminArticleListResponse(
-                            article.getId(),
-                            article.getSourceTitle(),
-                            article.getSourcePublisher(),
-                            article.getStatus().name(),
-                            article.getCategory().getDisplayName(),
-                            article.getCreatedAt()));
+            articlePage = articleRepository.findAllByStatusNot(ArticleStatus.ARCHIVED, pageable);
         }
+
+        Map<UUID, Long> populated = populatedLevelsFor(articlePage.getContent());
+        Page<AdminArticleListResponse> result = articlePage.map(article -> new AdminArticleListResponse(
+                article.getId(),
+                article.getSourceTitle(),
+                article.getSourcePublisher(),
+                article.getStatus().name(),
+                article.getCategory().getDisplayName(),
+                article.getCreatedAt(),
+                populated.getOrDefault(article.getId(), 0L)));
 
         return ResponseEntity.ok(result);
     }
@@ -250,7 +249,23 @@ public class AdminArticleController {
         }
     }
 
+    /** One grouped query instead of a count per row. */
+    private Map<UUID, Long> populatedLevelsFor(List<Article> articles) {
+        if (articles.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> ids = articles.stream().map(Article::getId).toList();
+        Map<UUID, Long> counts = new HashMap<>();
+        for (Object[] row : contentRepository.countPopulatedLevelsByArticleIds(ids)) {
+            counts.put((UUID) row[0], (Long) row[1]);
+        }
+        return counts;
+    }
+
     // ── Allowed status transitions ────────────────────────────────────────
+
+    /** EASY, MEDIUM and HARD must all carry generated text before an article can go public. */
+    private static final int REQUIRED_LEVELS = 3;
 
     private record Transition(ArticleStatus from, ArticleStatus to) {}
 
@@ -286,6 +301,20 @@ public class AdminArticleController {
                         return ResponseEntity.badRequest()
                                 .body((Object) Map.of("message",
                                         "Invalid status transition: " + article.getStatus() + " → " + newStatus));
+                    }
+
+                    // The feed falls back to the source article when a level has no generated text,
+                    // so publishing an incomplete article would show readers the original wording.
+                    // Refuse rather than rely on whoever clicks Publish having checked.
+                    if (newStatus == ArticleStatus.PUBLISHED) {
+                        long populated = contentRepository.countPopulatedLevels(articleId);
+                        if (populated < REQUIRED_LEVELS) {
+                            return ResponseEntity.badRequest()
+                                    .body((Object) Map.of("message",
+                                            "Cannot publish: only " + populated + " of " + REQUIRED_LEVELS
+                                                    + " difficulty levels have generated content. "
+                                                    + "Regenerate the missing levels first."));
+                        }
                     }
 
                     article.updateStatus(newStatus);

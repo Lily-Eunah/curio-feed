@@ -218,6 +218,8 @@ export default function ArticleDetailPage() {
     (searchParams.get('level') as DifficultyLevel) || 'EASY'
   );
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showDigestModal, setShowDigestModal] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [expandedVocab, setExpandedVocab] = useState(false);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
@@ -248,6 +250,7 @@ export default function ArticleDetailPage() {
       refetchStatus();
       queryClient.invalidateQueries({ queryKey: ['adminArticles'] });
       setShowPublishModal(false);
+      setShowArchiveModal(false);
       setShowSuccessToast(true);
     },
   });
@@ -260,6 +263,7 @@ export default function ArticleDetailPage() {
       retryStep(id!, statusData!.job!.jobId, subJobId, stepType),
     onSuccess: () => {
       setShowRegenerateModal(false);
+      setShowDigestModal(false);
       navigate(`/admin/articles/${id}/status`);
     },
   });
@@ -276,6 +280,8 @@ export default function ArticleDetailPage() {
 
   const currentStatus = (detail?.status ?? statusData?.articleStatus) as ArticleStatus | undefined;
   const isPublished = currentStatus === 'PUBLISHED';
+  const isDraft = currentStatus === 'DRAFT';
+  const firstSubJobId = statusData?.job?.subJobs?.[0]?.subJobId;
 
   const activeContent = detail?.contents?.find((c) => c.level === selectedLevel);
 
@@ -295,6 +301,16 @@ export default function ArticleDetailPage() {
 
   const handleConfirmPublish = () => {
     statusMutation.mutate('PUBLISHED');
+  };
+
+  const handleConfirmArchive = () => {
+    statusMutation.mutate('ARCHIVED');
+  };
+
+  // Any sub-job id works: the server clears the stored digest and resets all three levels.
+  const handleConfirmDigestRegenerate = () => {
+    if (!firstSubJobId) return;
+    regenerateMutation.mutate({ subJobId: firstSubJobId, stepType: 'SOURCE_DIGEST' });
   };
 
   const isLoading = detailLoading;
@@ -322,9 +338,29 @@ export default function ArticleDetailPage() {
               Back to Status
             </Button>
           </Link>
+          {/* Article-level, not level-level: the digest is shared, so regenerating it rebuilds
+              every difficulty. Kept out of the per-level Regenerate modal for that reason. */}
+          <Button
+            variant="secondary"
+            loading={regenerateMutation.isPending && showDigestModal}
+            onClick={() => setShowDigestModal(true)}
+            className="px-4 py-2 font-semibold"
+          >
+            Regenerate from source
+          </Button>
+          {isDraft && (
+            <Button
+              variant="secondary"
+              loading={statusMutation.isPending && showArchiveModal}
+              onClick={() => setShowArchiveModal(true)}
+              className="px-4 py-2 font-semibold"
+            >
+              Archive
+            </Button>
+          )}
           <Button
             variant={isPublished ? 'danger' : 'primary'}
-            loading={statusMutation.isPending && !showPublishModal}
+            loading={statusMutation.isPending && !showPublishModal && !showArchiveModal}
             onClick={handlePublishClick}
             className="px-5 py-2 font-semibold"
           >
@@ -468,6 +504,63 @@ export default function ArticleDetailPage() {
             </Card>
           )}
         </>
+      )}
+
+      {/* Archive confirm — available on drafts so test rows never have to be published first */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Archive this article?</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              It is hidden from the working list and never appears in the public feed. Nothing is
+              deleted — it stays available under the Archived filter.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowArchiveModal(false)} className="px-4 py-2">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={statusMutation.isPending}
+                onClick={handleConfirmArchive}
+                className="px-4 py-2"
+              >
+                Archive
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate from source — article scoped, unlike the per-level Regenerate modal */}
+      {showDigestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Regenerate from source?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This discards the stored source digest and rebuilds{' '}
+              <strong>all three difficulty levels</strong> from the original article.
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              Use it when the digest itself is wrong or came from an older prompt. Levels that look
+              fine right now were written from that same digest, so they are replaced too.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowDigestModal(false)} className="px-4 py-2">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={regenerateMutation.isPending}
+                disabled={!firstSubJobId}
+                onClick={handleConfirmDigestRegenerate}
+                className="px-4 py-2"
+              >
+                Regenerate all levels
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Publish Confirm Modal matching screenshot 07 */}

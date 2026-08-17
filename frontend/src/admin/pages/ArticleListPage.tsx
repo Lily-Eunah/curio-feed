@@ -108,6 +108,9 @@ export default function ArticleListPage() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Levels
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Created
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -129,6 +132,24 @@ export default function ArticleListPage() {
                     </td>
                     <td className="px-6 py-4">
                       <StatusBadge status={article.status} />
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm">
+                      {/* Status cannot show this: a failed generation and a ready article are both
+                          DRAFT. Publishing below 3/3 makes the feed fall back to the source text. */}
+                      <span
+                        className={
+                          article.populatedLevels >= 3
+                            ? 'text-gray-500'
+                            : 'font-medium text-red-600'
+                        }
+                        title={
+                          article.populatedLevels >= 3
+                            ? 'All difficulty levels generated'
+                            : 'Incomplete — cannot be published until all three levels are generated'
+                        }
+                      >
+                        {article.populatedLevels}/3
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {new Date(article.createdAt).toLocaleDateString()}
