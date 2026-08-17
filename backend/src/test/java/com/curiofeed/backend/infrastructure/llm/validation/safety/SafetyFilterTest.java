@@ -64,6 +64,34 @@ class SafetyFilterTest {
     }
 
     @Test
+    @DisplayName("CopyrightPhraseDetector ignores long institution names even when the window slides over them")
+    void testCopyrightPhraseDetector_ignoresLongProperNounRuns() {
+        CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
+
+        // A ten-word institution name produces three overlapping 8-gram matches on its own,
+        // which used to exceed the tolerance and reject the article.
+        String original = "The trial was led by researchers at Harvard Medical School and Brigham and "
+                + "Women's Hospital over eighteen months.";
+        String reporting = "The work was carried out at Harvard Medical School and Brigham and "
+                + "Women's Hospital, the team said.";
+
+        assertThat(detector.check(reporting, original)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CopyrightPhraseDetector still flags lowercase prose lifted verbatim")
+    void testCopyrightPhraseDetector_stillFlagsLowercaseProse() {
+        CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
+
+        String original = "Its female personal investing customers recorded cumulative returns of fifty "
+                + "percent across the period, a pattern the analysts could not fully explain.";
+        String copied = "Reports show its female personal investing customers recorded cumulative returns of fifty "
+                + "percent across the period, a pattern the analysts could not fully explain.";
+
+        assertThat(detector.check(copied, original)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("CopyrightPhraseDetector tolerates an unavoidable proper-noun sequence")
     void testCopyrightPhraseDetector_tolerlatesShortUnavoidableOverlap() {
         CopyrightPhraseDetector detector = new CopyrightPhraseDetector();
