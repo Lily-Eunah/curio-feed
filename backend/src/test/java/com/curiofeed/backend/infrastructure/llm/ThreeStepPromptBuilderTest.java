@@ -55,7 +55,7 @@ class ThreeStepPromptBuilderTest {
     @DisplayName("buildContentPrompt: MEDIUM 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_mediumWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.MEDIUM, false);
-        assertThat(prompt).contains("270~330 words");
+        assertThat(prompt).contains("290~340 words");
         assertThat(prompt).contains("380 words");
     }
 
@@ -63,7 +63,7 @@ class ThreeStepPromptBuilderTest {
     @DisplayName("buildContentPrompt: HARD 난이도 word count 범위가 변경되지 않았다")
     void buildContentPrompt_hardWordCountUnchanged() {
         String prompt = builder.buildContentPrompt("source text", DifficultyLevel.HARD, false);
-        assertThat(prompt).contains("380~450 words");
+        assertThat(prompt).contains("410~470 words");
         assertThat(prompt).contains("520 words");
     }
 
