@@ -13,6 +13,7 @@ import java.util.UUID;
  * Handles step-level retry for the 3-step generation pipeline.
  *
  * Retry cascade rules (enforced here, not in the controller):
+ *   Retry SOURCE_DIGEST → reset every step, clear saved data AND the stored digest
  *   Retry CONTENT   → reset CONTENT, VOCABULARY, QUIZ; clear saved data
  *   Retry VOCABULARY→ reset VOCABULARY, QUIZ; clear vocab/quiz data
  *   Retry QUIZ      → reset QUIZ only; clear quiz data
@@ -30,18 +31,21 @@ public class StepRetryService {
     private final ArticleContentRepository contentRepository;
     private final VocabularyRepository vocabularyRepository;
     private final QuizRepository quizRepository;
+    private final ArticleRepository articleRepository;
 
     public StepRetryService(
             ArticleGenerationSubJobRepository subJobRepository,
             ArticleGenerationStepJobRepository stepJobRepository,
             ArticleContentRepository contentRepository,
             VocabularyRepository vocabularyRepository,
-            QuizRepository quizRepository) {
+            QuizRepository quizRepository,
+            ArticleRepository articleRepository) {
         this.subJobRepository = subJobRepository;
         this.stepJobRepository = stepJobRepository;
         this.contentRepository = contentRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.quizRepository = quizRepository;
+        this.articleRepository = articleRepository;
     }
 
     @Transactional
@@ -51,6 +55,22 @@ public class StepRetryService {
         DifficultyLevel level = subJob.getLevel();
 
         switch (stepType) {
+            case SOURCE_DIGEST -> {
+                // The digest is persisted on the article and reused by every level, so resetting the
+                // step alone would hand the same stored digest straight back. Clear it too, or a
+                // regenerate silently keeps whatever the previous prompt version produced.
+                log.info("[telemetry] subJobId={} level={} retryStep=SOURCE_DIGEST invalidatedSteps=[ALL] clearedStoredDigest=true",
+                        subJobId, level);
+                articleRepository.findById(articleId).ifPresent(article -> {
+                    article.storeSourceDigest(null);
+                    articleRepository.save(article);
+                });
+                resetOrDeleteStep(subJobId, GenerationStepType.SOURCE_DIGEST);
+                resetOrDeleteStep(subJobId, GenerationStepType.CONTENT);
+                resetOrDeleteStep(subJobId, GenerationStepType.VOCABULARY);
+                resetOrDeleteStep(subJobId, GenerationStepType.QUIZ);
+                clearSavedContent(articleId, level);
+            }
             case CONTENT -> {
                 // Wipe all step state and saved data; re-run from scratch
                 log.info("[telemetry] subJobId={} level={} retryStep=CONTENT invalidatedSteps=[CONTENT,VOCABULARY,QUIZ]",

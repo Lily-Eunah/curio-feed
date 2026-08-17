@@ -5,7 +5,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
-import { getAdminArticleDetail, getGenerationStatus, updateAdminArticleStatus, retrySubJob, retryStep } from '../api/client';
+import { getAdminArticleDetail, getGenerationStatus, updateAdminArticleStatus, retryStep } from '../api/client';
 import type { ArticleStatus, DifficultyLevel, AdminVocabInfo, AdminQuizInfo, GenerationStepType } from '../api/types';
 
 const LEVEL_ORDER: DifficultyLevel[] = ['EASY', 'MEDIUM', 'HARD'];
@@ -253,10 +253,11 @@ export default function ArticleDetailPage() {
   });
 
   const regenerateMutation = useMutation({
-    mutationFn: ({ subJobId, stepType }: { subJobId: string, stepType: GenerationStepType }) => 
-      stepType === 'SOURCE_DIGEST' 
-        ? retrySubJob(id!, statusData!.job!.jobId, subJobId)
-        : retryStep(id!, statusData!.job!.jobId, subJobId, stepType),
+    // SOURCE_DIGEST used to go through retrySubJob, which only accepts a FAILED sub-job and
+    // leaves the stored digest in place. retryStep handles every step, clears the stored
+    // digest for SOURCE_DIGEST, and works whatever state the sub-job is in.
+    mutationFn: ({ subJobId, stepType }: { subJobId: string, stepType: GenerationStepType }) =>
+      retryStep(id!, statusData!.job!.jobId, subJobId, stepType),
     onSuccess: () => {
       setShowRegenerateModal(false);
       navigate(`/admin/articles/${id}/status`);

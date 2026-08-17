@@ -77,7 +77,9 @@ public class AdminArticleController {
                             article.getCategory().getDisplayName(),
                             article.getCreatedAt()));
         } else {
-            result = articleRepository.findAll(pageable)
+            // No explicit filter means the working list: archived articles are kept for provenance
+            // but stay out of the way until asked for with status=ARCHIVED.
+            result = articleRepository.findAllByStatusNot(ArticleStatus.ARCHIVED, pageable)
                     .map(article -> new AdminArticleListResponse(
                             article.getId(),
                             article.getSourceTitle(),
@@ -254,6 +256,8 @@ public class AdminArticleController {
 
     private static final java.util.Set<Transition> ALLOWED_TRANSITIONS = java.util.Set.of(
             new Transition(ArticleStatus.DRAFT, ArticleStatus.PUBLISHED),
+            // Without this, clearing a draft that should never go live meant publishing it first.
+            new Transition(ArticleStatus.DRAFT, ArticleStatus.ARCHIVED),
             new Transition(ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED),
             new Transition(ArticleStatus.ARCHIVED, ArticleStatus.PUBLISHED)
     );

@@ -10,13 +10,14 @@ import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { getAdminArticles } from '../api/client';
 
+// Must match the ArticleStatus enum. REVIEWING/HIDDEN/FAILED were listed here but do not
+// exist server-side, so selecting them failed the request with a 400.
+// The empty value is the working list: everything except archived.
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: '', label: 'Active' },
   { value: 'DRAFT', label: 'Draft' },
-  { value: 'REVIEWING', label: 'Reviewing' },
   { value: 'PUBLISHED', label: 'Published' },
-  { value: 'HIDDEN', label: 'Hidden' },
-  { value: 'FAILED', label: 'Failed' },
+  { value: 'ARCHIVED', label: 'Archived' },
 ];
 
 const PAGE_SIZE = 20;
