@@ -6,6 +6,7 @@ import com.curiofeed.backend.domain.repository.*;
 import com.curiofeed.backend.infrastructure.llm.*;
 import com.curiofeed.backend.infrastructure.llm.validation.*;
 import com.curiofeed.backend.infrastructure.llm.validation.safety.CompositeSafetyFilter;
+import com.curiofeed.backend.infrastructure.llm.validation.safety.CopyrightPhraseDetector;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -70,6 +71,7 @@ public class ThreeStepSubJobWorker {
     private final TitleSimilarityValidator titleSimilarityValidator;
 
     private final CompositeSafetyFilter safetyFilter;
+    private final CopyrightPhraseDetector copyrightPhraseDetector;
     private final QualityScorer qualityScorer;
     private final ThreeStepPipelineMetrics metrics;
     private final SemanticEvaluatorService semanticEvaluator;
@@ -95,6 +97,7 @@ public class ThreeStepSubJobWorker {
             VocabLemmatizer vocabLemmatizer,
             TitleSimilarityValidator titleSimilarityValidator,
             CompositeSafetyFilter safetyFilter,
+            CopyrightPhraseDetector copyrightPhraseDetector,
             QualityScorer qualityScorer,
             ThreeStepPipelineMetrics metrics,
             SemanticEvaluatorService semanticEvaluator,
@@ -118,6 +121,7 @@ public class ThreeStepSubJobWorker {
         this.vocabLemmatizer = vocabLemmatizer;
         this.titleSimilarityValidator = titleSimilarityValidator;
         this.safetyFilter = safetyFilter;
+        this.copyrightPhraseDetector = copyrightPhraseDetector;
         this.qualityScorer = qualityScorer;
         this.metrics = metrics;
         this.semanticEvaluator = semanticEvaluator;
@@ -392,14 +396,21 @@ public class ThreeStepSubJobWorker {
         stepJobRepository.save(step);
 
         boolean titleTooSimilar = false;
+        boolean digestCopiedSource = false;
 
         for (int attempt = 1; attempt <= MAX_STEP_RETRIES; attempt++) {
             Instant start = Instant.now();
             try {
-                String prompt = titleTooSimilar
-                        ? promptBuilder.buildSourceDigestRetryPrompt(originalTitle, originalContent)
-                        : promptBuilder.buildSourceDigestPrompt(originalTitle, originalContent);
+                String prompt;
+                if (digestCopiedSource) {
+                    prompt = promptBuilder.buildSourceDigestRetryPrompt(originalTitle, originalContent, "copied_source");
+                } else if (titleTooSimilar) {
+                    prompt = promptBuilder.buildSourceDigestRetryPrompt(originalTitle, originalContent, "title_too_similar");
+                } else {
+                    prompt = promptBuilder.buildSourceDigestPrompt(originalTitle, originalContent);
+                }
                 titleTooSimilar = false;
+                digestCopiedSource = false;
 
                 log.info("[diagnostics] subJob={} step=SOURCE_DIGEST attempt={} event=LLM_REQUEST_START ts={}", subJobId, attempt, Instant.now());
                 String raw = callLlmWithFallback(prompt, ThreeStepPromptBuilder.sourceDigestSchema(), subJobId, "SOURCE_DIGEST");
@@ -412,6 +423,21 @@ public class ThreeStepSubJobWorker {
 
                 if (digest == null || digest.centralStory() == null) {
                     throw new IllegalStateException("SourceDigest missing from LLM response");
+                }
+
+                // The digest is the only thing CONTENT ever sees, so any source phrasing it copies
+                // is reproduced downstream and fails the copyright gate three levels over. Catch it
+                // here: one regenerated digest is cheaper than three wasted CONTENT attempts.
+                List<String> copied = copyrightPhraseDetector.check(formatDigest(digest), originalContent);
+                if (!copied.isEmpty()) {
+                    log.warn("[telemetry] subJob={} step=SOURCE_DIGEST attempt={} digest_copied_source=true detail={}",
+                            subJobId, attempt, copied.get(0));
+                    if (attempt < MAX_STEP_RETRIES) {
+                        digestCopiedSource = true;
+                        continue;
+                    }
+                    markStepFailed(step, subJob, "SAFETY_VIOLATION", copied.get(0), copied.get(0));
+                    return null;
                 }
 
                 boolean similarTitle = titleSimilarityValidator.isTooSimilar(digest.suggestedTitle(), originalTitle);
