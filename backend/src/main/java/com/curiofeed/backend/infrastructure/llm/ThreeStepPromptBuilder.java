@@ -173,7 +173,10 @@ public class ThreeStepPromptBuilder {
                     • Use a rarer word ONLY when it is the precise term and a plain one would be vague.
 
                     WHAT HARD ADDS OVER MEDIUM:
-                    • Competing viewpoints and the tension between them, not just the headline claim.
+                    • Where the source actually contains disagreement, the competing positions and the
+                      tension between them. If its experts broadly agree, present them as agreeing.
+                      Never stage a debate the source does not have: writing "experts offering competing
+                      viewpoints" over four people who say the same thing misrepresents the reporting.
                     • The reasoning behind expert positions, not only their conclusions.
                     • Caveats, limitations, and what remains unresolved.
                     • Include about 9-11 core facts from the source.

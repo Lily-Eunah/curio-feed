@@ -83,6 +83,14 @@ class ThreeStepPromptBuilderTest {
         assertThat(prompt).contains("Thesaurus prose is a failure");
     }
 
+    @Test
+    @DisplayName("buildContentPrompt: HARD는 원문에 없는 대립구도를 만들지 말라고 지시받는다")
+    void buildContentPrompt_hardMustNotManufactureDebate() {
+        String prompt = builder.buildContentPrompt("source text", DifficultyLevel.HARD, true);
+        assertThat(prompt).contains("Never stage a debate the source does not have");
+        assertThat(prompt).contains("If its experts broadly agree, present them as agreeing");
+    }
+
     @ParameterizedTest
     @EnumSource(DifficultyLevel.class)
     @DisplayName("buildContentPrompt: 모든 난이도에 온보딩과 동일한 레벨 보정 예시가 포함된다")
