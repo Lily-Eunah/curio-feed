@@ -65,6 +65,8 @@ export interface AdminArticleListItem {
   status: ArticleStatus;
   categoryName: string;
   createdAt: string;
+  /** Difficulty levels holding generated text, out of 3. Below 3 the article cannot be published. */
+  populatedLevels: number;
 }
 
 export interface AdminArticleListPage {

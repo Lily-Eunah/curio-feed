@@ -22,7 +22,9 @@ const STATUS_CONFIG: Record<StatusType, StatusConfig> = {
   FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700' },
   DRAFT: { label: 'Draft', className: 'bg-gray-100 text-gray-700' },
   PUBLISHED: { label: 'Published', className: 'bg-green-100 text-green-700' },
-  ARCHIVED: { label: 'Archived', className: 'bg-gray-100 text-gray-500' },
+  // Amber rather than red: archiving is a deliberate action, not a failure, and red already
+  // means FAILED on the generation screens.
+  ARCHIVED: { label: 'Archived', className: 'bg-amber-100 text-amber-700' },
   SKIPPED: { label: 'Skipped', className: 'bg-gray-100 text-gray-400' },
 };
 
