@@ -1,111 +1,155 @@
-# CurioFeed 🚀
-Fuel your curiosity, Master your English.
+# CurioFeed
 
-CurioFeed is a content-driven English learning platform that enables users to improve their English skills while reading articles and columns they are genuinely interested in.
+**A production-grade English learning platform powered by a validated, recoverable LLM pipeline.**
 
-By strategically transforming complex articles into optimized learning tiers, CurioFeed bridges the gap between high-level editorial content and individual linguistic capabilities, creating a seamless flow from curiosity to fluency.
+CurioFeed turns real articles into level-appropriate reading, vocabulary, audio, and quizzes. Each article is transformed into Easy, Medium, and Hard versions through a tracked four-stage pipeline built for validation, targeted retries, model failover, and human approval.
 
-**🔗 Live Demo: [curio-feed.pages.dev](https://curio-feed.pages.dev)**
+[Live app](https://curio-feed.pages.dev) · [Engineering case study](https://lily-eunah.github.io/curiofeed-case-study/) · [Medium series](https://medium.com/@yua12271109)
 
-> CurioFeed is designed as a **mobile-first reading experience** — for the best impression, open the demo on a phone or a narrow browser window. On wide screens the app renders inside a centered device frame.
+> The reader is mobile-first. Open the live app on a phone or in a narrow browser window for the intended experience.
 
-## 🌟 Key Features
+<img width="860" height="560" alt="image" src="https://github.com/user-attachments/assets/a3be46f6-f4c7-49ae-9aec-e81516f23877" />
 
-* **Curated Learning Feed**: A hand-picked selection of high-quality articles across Tech, Business, and Culture—ensuring users learn from the best sources.
-* **Tri-Level Content Scaling**: Every article is pre-transformed into **Easy, Medium, and Hard** versions using LLM orchestration, optimizing for both readability and linguistic progression.
-* **Optimized Multimodal Experience**: High-fidelity TTS audio is pre-generated and cached for instant playback. This enables simultaneous reading and listening to enhance phonetic awareness and auditory comprehension.
-* **Interactive Vocabulary Insights**: A smart tooltip system provides instant English-to-English definitions and contextual examples, fostering an immersive "thinking in English" environment.
-* **Contextual Knowledge Validation**: Dynamically generated comprehension and vocabulary quizzes reinforce learning and track progress through data-driven insights.
+<img width="860" height="459" alt="image" src="https://github.com/user-attachments/assets/3186b593-8a91-4e79-b304-c9fc9995209c" />
 
-## 🏗 System Architecture & Tech Stack
+## Engineering outcomes
 
-This project is structured as a monorepo with clear separation between frontend, backend, and infrastructure components.
+| Area | Result |
+| --- | --- |
+| LLM reliability | Raised generation success from **46.7% to 95.0%** with validation and step-level corrective retries |
+| Cost efficiency | Reduced token use by **39.9%** by retrying only the failed stage instead of regenerating the full article |
+| Database performance | Replaced an O(N) cursor predicate with an index seek, reducing a depth-500k read from **~9.5s to 1.8ms** on a 1M-row benchmark |
+| Operational recovery | Added atomic job locking, heartbeats, and reconciliation for stalled generation work |
+| Safety | Added fact-digest rewriting, title-similarity blocking, quality gates, and human approval before publication |
 
-| Layer | Technology |
-|-------|------------|
-| **Backend** | Java 21, Spring Boot 3.2, Spring Data JPA, Flyway (migrations) |
-| **Frontend** | React 18 + Vite, TypeScript, Tailwind CSS, TanStack Query |
-| **AI / Media** | Google Gemini API (content generation), Google Cloud Text-to-Speech (TTS) |
-| **Data** | PostgreSQL (JSONB for flexible quiz schemas; UUID v7 for time-ordered cursor pagination) |
-| **Testing** | JUnit 5, Testcontainers (`postgres:16`), Vitest + Testing Library |
-| **Observability** | Spring Actuator, Micrometer → Prometheus / Grafana Cloud |
-| **Infra** | Docker, Docker Compose |
+The LLM figures come from a fixed evaluation set of 15 article-and-difficulty runs. The pagination result is a scoped `EXPLAIN ANALYZE` benchmark, not a general latency claim.
 
-## 🤖 AI Content Pipeline
+## Product experience
 
-Every source article is transformed into three reading levels (**EASY / MEDIUM / HARD**), and each level runs through a tracked, resumable 4-step generation pipeline:
+- Three reading levels—Easy, Medium, and Hard—from the same source article
+- Pre-generated, cached audio with a seekable player
+- English-to-English vocabulary definitions and contextual examples
+- Comprehension and vocabulary quizzes
+- Saved and continue-reading states
+- Protected operator console for ingestion, review, retry, and publishing
+
+## System architecture
 
 ```mermaid
 flowchart LR
-    SRC[Source Article] --> SD[SOURCE_DIGEST]
-    SD --> C[CONTENT]
-    C --> V[VOCABULARY]
-    C --> Q[QUIZ]
+    A[Source article] --> D[Source digest]
+    D --> C[Leveled content]
+    C --> V[Vocabulary]
+    C --> Q[Quiz]
     V --> Q
-    Q --> PUB[(Published: 3 levels + TTS)]
+
+    D -. validate .-> G[Quality gates]
+    C -. validate .-> G
+    V -. validate .-> G
+    Q -. validate .-> G
+
+    G --> H[Human approval]
+    H --> P[Published lesson]
+    P --> T[Cached audio]
+
+    J[(PostgreSQL job state)] --- D
+    J --- C
+    J --- V
+    J --- Q
+    O[Prometheus / Grafana] -. observes .-> J
 ```
 
-The pipeline is built to run as an **operable system**, not a one-shot prompt:
+Every article creates one generation job, three level-specific sub-jobs, and a tracked job for each pipeline stage. Retrying an upstream stage invalidates only its dependents. Heartbeats and reconciliation recover work left behind by a failed worker.
 
-- **Job tracking** — one `ArticleGenerationJob` per article → one `SubJob` per difficulty level → per-step `StepJob` records.
-- **Step-level retries** — any step (CONTENT / VOCABULARY / QUIZ) can be re-run independently; retrying an upstream step invalidates dependent steps.
-- **Validation & quality scoring** — generated content is validated (e.g. title-similarity, level-appropriate score thresholds) before a level is published.
-- **Pre-generated multimodal assets** — TTS audio is generated and cached per level for instant playback.
+## Reliability design
 
-A protected admin console (`/admin`) exposes this pipeline: article ingestion, per-step status, and manual retries.
+- **Structured output:** generated data is parsed into typed schemas instead of accepted as free-form text.
+- **Targeted recovery:** only the failed stage is repaired or regenerated.
+- **Dependency-aware retries:** regenerating content also refreshes its derived vocabulary and quiz.
+- **Fail-closed publishing:** content must clear automated checks and receive human approval.
+- **Provider boundary:** the LLM client is isolated behind a provider-agnostic interface for model swaps and benchmarking.
+- **Rate control:** generation is globally throttled to respect model quotas across concurrent workers.
+- **Observability:** pipeline state, timing, failures, and rate-limit behavior are exposed through application metrics.
 
+## Tech stack
 
-## 🚦 How to run locally
+| Layer | Technology |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3.2, Spring Data JPA, Flyway |
+| Frontend | React 18, TypeScript, Vite, TanStack Query |
+| AI | Google Gemini behind a provider-agnostic client layer |
+| Data | PostgreSQL, JSONB, UUID v7 keyset pagination |
+| Testing | JUnit 5, Testcontainers, Vitest, Testing Library |
+| Operations | Docker, Micrometer, Prometheus, Grafana |
+| Hosting | Cloudflare Pages, Render, managed PostgreSQL |
 
-The entire stack is containerized for easy local development.
+## Repository structure
 
-1. Ensure Docker and Docker Compose are installed.
-2. From the root directory, navigate to `/infra` and run the infrastructure:
-   ```bash
-   cd infra
-   docker-compose up -d --build
-   ```
-3. Access Services:
-   - **Frontend**: http://localhost:3000
-   - **Backend API**: http://localhost:8080 (health check at `/actuator/health`)
-   - **Admin console**: http://localhost:3000/admin — set `ADMIN_API_TOKEN` in `infra/.env` (see `infra/.env.example`) and enter it when prompted.
+```text
+backend/    Spring Boot API, generation pipeline, persistence, and tests
+frontend/   Reader and operator interfaces
+infra/      Local Docker Compose and observability configuration
+docs/       Deployment and engineering notes
+```
 
+## Run locally
 
+### Prerequisites
 
-## 🚀 Production Deployment
+- Java 21
+- Node.js and npm
+- Docker with Docker Compose
 
-The live demo runs on a managed, low-cost stack:
+Start PostgreSQL:
 
-- **Frontend**: **Cloudflare Pages** (global CDN + edge delivery). API base URL is injected at build time via `VITE_API_BASE_URL`.
-- **Backend**: containerized Spring Boot service on **Render** (`render.yaml`), with a managed PostgreSQL instance.
-- **Admin API security**: `/api/admin/**` is guarded by a shared token — set `ADMIN_API_TOKEN` in the backend environment and supply it via the `X-Admin-Token` header (the admin console prompts for it). When unset, the admin API is fail-closed (returns `503`).
+```bash
+cd infra
+docker compose up -d db
+```
 
-> A self-hosted alternative (Oracle Cloud Always Free VM + Caddy + Neon PostgreSQL) is documented in [`docs/DEPLOYMENT_PHASE1.md`](docs/DEPLOYMENT_PHASE1.md) and the [full infrastructure plan](implementation_plan.md).
+Start the backend:
 
-## 📐 Design Decisions
+```bash
+cd backend
+./gradlew bootRun
+```
 
-Some of the architectural "why" behind CurioFeed:
+Start the frontend in a second terminal:
 
-- **Java 21 + Spring Boot 3.2** — virtual threads for cheap concurrency in the generation pipeline, and a long-support baseline.
-- **Content caching over on-the-fly generation** — all three reading levels and their TTS audio are pre-generated and cached, so the read/listen experience is instant and LLM/TTS cost is bounded and predictable.
-- **PostgreSQL JSONB for quiz schemas** — multiple-choice, short-answer, and scramble quizzes share one flexible column instead of rigid per-type tables.
-- **UUID v7 + cursor pagination** — time-ordered IDs make `(published_at, id)` cursors stable without a separate sort key.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## 🗺 Roadmap
+The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:8080`.
 
-**Done**
-- ✅ Tri-level (Easy/Medium/Hard) LLM content pipeline with step-level retries
-- ✅ Pre-generated, cached TTS audio per level
-- ✅ Metrics & observability (Prometheus / Grafana Cloud)
-- ✅ Token-protected admin console
+External generation requires provider credentials. Use the checked-in example configuration as a guide, keep real credentials out of Git, and do not run live model tests unless you intend to consume quota.
 
-**Next**
-- Spaced repetition system (SRS) for vocabulary retention
-- Personalized recommendations based on reading behavior
-- Progress analytics for comprehension and vocabulary growth
-- Fully asynchronous generation pipeline (queue-based)
+## Verify changes
 
-## 🤝 Contact
-Lily (Eunah Yang) — Software Engineer at Samsung Electronics
-LinkedIn: [Eunah Yang](https://www.linkedin.com/in/eunah-yang-3a86553a4/)
-Email: yua12271109@gmail.com
+```bash
+cd backend
+./gradlew test
+
+cd ../frontend
+npm run lint
+npm run test
+npm run build
+```
+
+Default tests exclude live model integrations. The backend uses Testcontainers PostgreSQL so JSONB, migrations, and database behavior are exercised against the production database family rather than an in-memory substitute.
+
+## Further reading
+
+- [Engineering Reliable LLM Pipelines: From 46.7% to 95%](https://medium.com/@yua12271109/engineering-reliable-llm-pipelines-from-46-7-to-95-f560ae4b311e)
+- [Your "Cursor Pagination" May Still Be O(N)](https://medium.com/@yua12271109/your-cursor-pagination-may-still-be-o-n-from-offset-to-a-real-index-seek-9177c613aaa7)
+- [The Fastest Hibernate Fetch Plan Wasn't One Query](https://medium.com/@yua12271109/the-fastest-hibernate-fetch-plan-wasnt-one-query-be8e88878afa)
+
+## Author
+
+Built by [Eunah (Lily) Yang](https://www.linkedin.com/in/eunah-yang-3a86553a4/).
+
+## License
+
+No open-source license is currently granted. The source is publicly available for portfolio review; all rights are reserved unless a license is added.
