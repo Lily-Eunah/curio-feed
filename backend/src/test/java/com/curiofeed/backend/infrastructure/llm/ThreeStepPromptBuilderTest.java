@@ -180,8 +180,39 @@ class ThreeStepPromptBuilderTest {
 
         assertThat(prompt).contains("KEEP 1-2 HUMAN DETAILS");
         assertThat(prompt).contains("indirect speech");
-        assertThat(prompt).contains("NEVER copy the original wording");
+        assertThat(prompt).contains("RESTATE EVERYTHING");
+        assertThat(prompt).contains("Never lift a run of words from the article");
+        assertThat(prompt).contains("Name the person if the article names them");
         assertThat(prompt).contains("humanDetails");
+    }
+
+    @Test
+    @DisplayName("buildSourceDigestRetryPrompt: 복제 사유일 때 제목이 아니라 재진술을 교정한다")
+    void buildSourceDigestRetryPrompt_copiedSourceBranch() {
+        String copied = builder.buildSourceDigestRetryPrompt("Original Title", "body", "copied_source");
+        String title = builder.buildSourceDigestRetryPrompt("Original Title", "body", "title_too_similar");
+
+        assertThat(copied).contains("reused the article's own wording");
+        assertThat(copied).doesNotContain("too similar to the original title");
+
+        assertThat(title).contains("too similar to the original title");
+        assertThat(title).doesNotContain("reused the article's own wording");
+    }
+
+    @Test
+    @DisplayName("buildSourceDigestPrompt: 가장 긴 레벨을 지탱할 만큼 추출하라고 지시한다")
+    void buildSourceDigestPrompt_extractsEnoughForLongestLevel() {
+        String prompt = builder.buildSourceDigestPrompt("Original Title", "body");
+        assertThat(prompt).contains("at least 12 substantive items");
+        assertThat(prompt).contains("cannot invent what you omit");
+    }
+
+    @Test
+    @DisplayName("buildContentPrompt: EASY는 다이제스트가 넘치게 주어진다는 전제로 취사선택을 지시받는다")
+    void buildContentPrompt_easyIsToldToSelectNotCoverEverything() {
+        String prompt = builder.buildContentPrompt("source text", DifficultyLevel.EASY, true);
+        assertThat(prompt).contains("SELECT the few facts");
+        assertThat(prompt).contains("is a failure at this level, not thoroughness");
     }
 
     @Test

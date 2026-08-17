@@ -32,15 +32,27 @@ public class ThreeStepPromptBuilder {
                 You are a precise information analyst.
                 Your task is to compress a long news article into a structured "Source Digest" that will be used by another AI to write a short version for language learners.
 
+                RESTATE EVERYTHING — THIS APPLIES TO EVERY FIELD BELOW:
+                Write every line in your own words. Never lift a run of words from the article, not in
+                coreFacts, not in supportingDetails, not anywhere. Anything you copy is reproduced by
+                the writer downstream and fails a verbatim-copying check, wasting the whole article.
+                Named entities, figures and job titles may of course be reused — those are facts, not
+                phrasing. What you must not carry over is the article's wording around them.
+                  Article: "its female personal investing customers recorded cumulative returns of 50%%"
+                  Digest:  "women's accounts returned 50%% over the three years studied"
+                Keep the meaning exact while changing the construction.
+
                 COMPRESSION RULES:
                 1. DO NOT write a story. Extract core information in bullet points or short sentences.
                 2. PRESERVE: Central story, main actors, main cause-effect relationships, and the final outcome.
                 3. KEEP 1-2 HUMAN DETAILS. A digest of pure statistics produces a lifeless article.
                    Pick the one or two concrete, specific details that make the central story real to a
                    reader — what a named person experienced, a price they paid, a number that lands.
-                   Report them in your own words as indirect speech. NEVER copy the original wording:
-                   write `a British mother said her family ate a street-food meal for about one pound`,
-                   not the sentence the article used. Put these in humanDetails, not coreFacts.
+                   Name the person if the article names them, and keep their exact figures: write
+                   `Teleri Evans, a civil servant from Cardiff, reached GBP 40,000 by age 33, of which
+                   GBP 8,000 came from investment returns`, not `a saver built up a large fund`.
+                   Anonymising the person or rounding the number away defeats the purpose.
+                   Still restate the wording as indirect speech. Put these in humanDetails, not coreFacts.
                 4. REMOVE: repeated examples, third and later quotes making the same point,
                    scene-setting description, and non-essential background.
                 5. DO NOT add any information or interpretations not present in the original article.
@@ -55,7 +67,10 @@ public class ThreeStepPromptBuilder {
                    • Do NOT resolve what the article leaves open. If it says "some sellers", do not
                      write "most sellers".
                    • When the article is vague, your digest must stay equally vague.
-                6. Ensure the digest is concise but contains enough factual density for a 260-420 word summary.
+                6. The digest is the ONLY material the writer gets, and the longest version they must
+                   produce is around 470 words carrying 9-11 distinct facts. Extract enough to support
+                   that: aim for at least 12 substantive items across coreFacts and supportingDetails.
+                   Being too sparse here caps the long version short — it cannot invent what you omit.
                 7. Generate a completely new, engaging English title based solely on the extracted facts.
                    ORIGINAL TITLE (do NOT reuse any phrase of 3 or more consecutive words from this): "%s"
                    Use a different angle, verb, or structure to express the same facts.
@@ -108,7 +123,10 @@ public class ThreeStepPromptBuilder {
 
                     • Average sentence length about 12 words. Never write a sentence over 22 words.
                     • One main idea per sentence. At most one subordinate clause.
-                    • Include about 4-5 core facts from the source.
+                    • Include about 4-5 core facts from the source. The source deliberately contains
+                      far more than that — it is sized for the longest version. SELECT the few facts
+                      that carry the central story and leave the rest out. Covering everything you were
+                      given is a failure at this level, not thoroughness.
                     • Target: 180~240 words.
                     • Absolute hard limit: 280 words.
                     • Paragraph structure: Write EXACTLY 3 paragraphs.
@@ -432,14 +450,28 @@ public class ThreeStepPromptBuilder {
      * is too similar to the original (detected by TitleSimilarityValidator).
      */
     public String buildSourceDigestRetryPrompt(String originalTitle, String originalArticle) {
-        String correction = "\n⚠ CORRECTION: The suggested title was too similar to the original title. " +
-                "Generate a completely different title — avoid repeating these specific words and phrases: \"" +
-                originalTitle + "\". " +
-                "Choose a different angle, verb, and sentence structure.";
+        return buildSourceDigestRetryPrompt(originalTitle, originalArticle, "title_too_similar");
+    }
+
+    /** @param retryReason "title_too_similar" or "copied_source" */
+    public String buildSourceDigestRetryPrompt(String originalTitle, String originalArticle, String retryReason) {
+        String correction = switch (retryReason == null ? "" : retryReason) {
+            case "copied_source" -> """
+
+                    ⚠ CORRECTION: The previous digest reused the article's own wording.
+                    Every fact must be re-expressed in a different construction. Change the verbs, the
+                    order of the clauses, and the way each figure is introduced. Keep names, numbers and
+                    job titles — restate everything around them. Read each line back and ask whether a
+                    run of words could be found in the article; if so, rewrite that line.""";
+            default -> "\n⚠ CORRECTION: The suggested title was too similar to the original title. " +
+                    "Generate a completely different title — avoid repeating these specific words and phrases: \"" +
+                    originalTitle + "\". " +
+                    "Choose a different angle, verb, and sentence structure.";
+        };
         String base = buildSourceDigestPrompt(originalTitle, originalArticle);
         return base.replaceFirst(
                 "(You are a precise information analyst\\.)",
-                "$1" + correction);
+                "$1" + java.util.regex.Matcher.quoteReplacement(correction));
     }
 
     /**
