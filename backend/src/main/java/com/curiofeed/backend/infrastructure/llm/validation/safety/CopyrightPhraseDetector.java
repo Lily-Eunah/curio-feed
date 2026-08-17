@@ -20,6 +20,15 @@ public class CopyrightPhraseDetector {
     private static final int MIN_CONTENT_WORDS = 2;
 
     /**
+     * Above this share of capitalised words, a run is a name rather than borrowed phrasing.
+     *
+     * <p>"Harvard Medical School and Brigham and Women's Hospital" cannot be paraphrased and is
+     * long enough that the sliding window flags it several times over, which on its own exceeded
+     * the tolerance. Reporting the same institution three times is not three copied phrases.
+     */
+    private static final double PROPER_NOUN_RATIO = 0.5;
+
+    /**
      * How many distinct offending phrases are tolerated before the content is rejected.
      *
      * <p>One or two long runs are usually unavoidable proper-noun sequences such as
@@ -55,7 +64,7 @@ public class CopyrightPhraseDetector {
             return violations;
         }
 
-        Set<String> originalNGrams = extractNGrams(originalArticle, NGRAM_SIZE);
+        Set<String> originalNGrams = extractComparableNGrams(originalArticle, NGRAM_SIZE);
         List<String> genWords = tokenize(generatedContent);
 
         if (genWords.size() < NGRAM_SIZE) {
@@ -92,13 +101,45 @@ public class CopyrightPhraseDetector {
         return count;
     }
 
-    private Set<String> extractNGrams(String text, int n) {
-        List<String> words = tokenize(text);
+    /**
+     * N-grams of the source that would count as copying if they reappeared.
+     *
+     * <p>Windows that are mostly capitalised in the source are left out: they are names of people,
+     * organisations and places, which have to be repeated verbatim to report the facts at all.
+     */
+    private Set<String> extractComparableNGrams(String text, int n) {
+        List<String> raw = tokenizeKeepingCase(text);
         Set<String> nGrams = new HashSet<>();
-        for (int i = 0; i <= words.size() - n; i++) {
-            nGrams.add(String.join(" ", words.subList(i, i + n)));
+        for (int i = 0; i <= raw.size() - n; i++) {
+            List<String> window = raw.subList(i, i + n);
+            if (capitalisedRatio(window) >= PROPER_NOUN_RATIO) {
+                continue;
+            }
+            nGrams.add(String.join(" ", window).toLowerCase(Locale.ROOT));
         }
         return nGrams;
+    }
+
+    private double capitalisedRatio(List<String> words) {
+        int capitalised = 0;
+        for (String w : words) {
+            if (!w.isEmpty() && Character.isUpperCase(w.charAt(0))) {
+                capitalised++;
+            }
+        }
+        return capitalised / (double) words.size();
+    }
+
+    /** Same splitting as {@link #tokenize}, but preserves case so names can be recognised. */
+    private List<String> tokenizeKeepingCase(String text) {
+        String clean = text.replaceAll("[^A-Za-z0-9\\s]", " ");
+        List<String> list = new ArrayList<>();
+        for (String t : clean.trim().split("\\s+")) {
+            if (!t.isBlank()) {
+                list.add(t);
+            }
+        }
+        return list;
     }
 
     private List<String> tokenize(String text) {
