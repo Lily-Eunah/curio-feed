@@ -16,13 +16,13 @@ CurioFeed turns real articles into level-appropriate reading, vocabulary, audio,
 
 | Area | Result |
 | --- | --- |
-| LLM reliability | Raised generation success from **46.7% to 95.0%** with validation and step-level corrective retries |
-| Cost efficiency | Reduced token use by **39.9%** by retrying only the failed stage instead of regenerating the full article |
+| LLM reliability | Raised end-to-end generation success from **46.7% to 93%** with validation and step-level corrective retries |
+| Cost efficiency | Reduced total tokens spent to complete a lesson by **39.9%**, including retries, by rerunning failed stages |
 | Database performance | Replaced an O(N) cursor predicate with an index seek, reducing a depth-500k read from **~9.5s to 1.8ms** on a 1M-row benchmark |
 | Operational recovery | Added atomic job locking, heartbeats, and reconciliation for stalled generation work |
 | Safety | Added fact-digest rewriting, title-similarity blocking, quality gates, and human approval before publication |
 
-The LLM figures come from a fixed evaluation set of 15 article-and-difficulty runs. The pagination result is a scoped `EXPLAIN ANALYZE` benchmark, not a general latency claim.
+Generation success increased from **14/30 to 28/30** on the same 30-case held-out set; 93% is rounded. Token savings are reported separately and include retries. The pagination result is a scoped `EXPLAIN ANALYZE` benchmark.
 
 ## Product experience
 
@@ -142,7 +142,7 @@ Default tests exclude live model integrations. The backend uses Testcontainers P
 
 ## Further reading
 
-- [Engineering Reliable LLM Pipelines: From 46.7% to 95%](https://medium.com/@yua12271109/engineering-reliable-llm-pipelines-from-46-7-to-95-f560ae4b311e)
+- [Engineering Reliable LLM Pipelines: From 46.7% to 93%](https://medium.com/@yua12271109/engineering-reliable-llm-pipelines-from-46-7-to-95-f560ae4b311e)
 - [Your "Cursor Pagination" May Still Be O(N)](https://medium.com/@yua12271109/your-cursor-pagination-may-still-be-o-n-from-offset-to-a-real-index-seek-9177c613aaa7)
 - [The Fastest Hibernate Fetch Plan Wasn't One Query](https://medium.com/@yua12271109/the-fastest-hibernate-fetch-plan-wasnt-one-query-be8e88878afa)
 
