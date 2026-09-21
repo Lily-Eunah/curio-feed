@@ -19,7 +19,7 @@ CurioFeed turns real articles into level-appropriate reading, vocabulary, audio,
 | LLM reliability | Raised end-to-end generation success from **46.7% to 93%** with validation and step-level corrective retries |
 | Cost efficiency | Reduced total tokens spent to complete a lesson by **39.9%**, including retries, by rerunning failed stages |
 | Database performance | Replaced an O(N) cursor predicate with an index seek, reducing a depth-500k read from **~9.5s to 1.8ms** on a 1M-row benchmark |
-| Operational recovery | Added atomic job locking, heartbeats, and reconciliation for stalled generation work |
+| Operational recovery | Added atomic job claims, persisted progress, and heartbeat tracking, with optional reconciliation for stalled jobs |
 | Safety | Added fact-digest rewriting, title-similarity blocking, quality gates, and human approval before publication |
 
 Generation success increased from **14/30 to 28/30** on the same 30-case held-out set; 93% is rounded. Token savings are reported separately and include retries. The pagination result is a scoped `EXPLAIN ANALYZE` benchmark.
@@ -59,7 +59,7 @@ flowchart LR
     O[Prometheus / Grafana] -. observes .-> J
 ```
 
-Every article creates one generation job, three level-specific sub-jobs, and a tracked job for each pipeline stage. Retrying an upstream stage invalidates only its dependents. Heartbeats and reconciliation recover work left behind by a failed worker.
+Every article creates one generation job, three level-specific sub-jobs, and a tracked job for each pipeline stage. Retrying an upstream stage invalidates only its dependents. Job state and heartbeats are persisted. An optional reconciliation scheduler can reset stalled jobs for retry; background polling and reconciliation are disabled by default.
 
 ## Reliability design
 
@@ -68,7 +68,7 @@ Every article creates one generation job, three level-specific sub-jobs, and a t
 - **Dependency-aware retries:** regenerating content also refreshes its derived vocabulary and quiz.
 - **Fail-closed publishing:** content must clear automated checks and receive human approval.
 - **Provider boundary:** the LLM client is isolated behind a provider-agnostic interface for model swaps and benchmarking.
-- **Rate control:** generation is globally throttled to respect model quotas across concurrent workers.
+- **Request pacing:** Gemini request starts are spaced within each application process, with bounded retries after HTTP 429 responses.
 - **Observability:** pipeline state, timing, failures, and rate-limit behavior are exposed through application metrics.
 
 ## Tech stack
